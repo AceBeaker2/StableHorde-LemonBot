@@ -1,4 +1,5 @@
 import disnake
+from typing import Optional
 from disnake.ext import commands
 from disnake.ui import Button
 from config import *
@@ -30,11 +31,10 @@ bot = commands.Bot(
     )
 
 
-
 @bot.event
 async def on_ready():
     print('The bot is ready!')
-    
+
 @bot.slash_command(description='Help menu!!!')
 async def config(inter):
     embed=disnake.Embed(title='Help menu!', color=0x00ff40)
@@ -59,15 +59,21 @@ async def upscale(
         text = f.read()
         vars = ast.literal_eval(text)
     
-    embed=disnake.Embed(title='Upscale Done!', color=0xf0e000)
-    embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
-    embed.set_image(file=disnake.File(filepath))
+    try:
+        embed=disnake.Embed(title='Upscale Done!', color=0xadd8e6)
+        embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
+        embed.set_image(file=disnake.File(filepath))
     
-    view = disnake.ui.View()
+        view = disnake.ui.View(timeout=None)
     
-    moreinfo = disnake.ui.Button(label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
-    variate = disnake.ui.Button(label='Make Variations', style=disnake.ButtonStyle.green)
-    outpaint = disnake.ui.Button(label='Outpaint', style=disnake.ButtonStyle.green)
+        moreinfo = disnake.ui.Button(label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
+        variate = disnake.ui.Button(label='Make Variations', style=disnake.ButtonStyle.green)
+        outpaint = disnake.ui.Button(label='Outpaint', style=disnake.ButtonStyle.green)
+    
+    except:
+        embed = disnake.Embed('Upscale Failed!', color=0xff0000)
+        
+        view = disnake.ui.View()
     
     async def infocallback(interaction):
         embed=disnake.Embed(title='Status Sheet', color=0xf0e000)
@@ -89,6 +95,7 @@ async def upscale(
     
     async def variatecallback(interaction):
         await interaction.send('Your Variation is on the way!', ephemeral=True) 
+        dm = False
         try:
              nsfw = not interaction.channel.nsfw or nsfw_filter
         except AttributeError:
@@ -127,6 +134,7 @@ async def upscale(
     
     async def outpaintcallback(interaction):
         author = interaction.user
+        dm = False
         try:
             nsfw = not interaction.channel.nsfw or nsfw_filter
         except AttributeError:
@@ -166,7 +174,7 @@ async def upscale(
             modal_inter: disnake.ModalInteraction = await bot.wait_for(
                 'modal_submit',
                 check=lambda i: i.custom_id == 'outpaint_modal' and i.author.id == interaction.author.id,
-                timeout=60,
+                timeout=600,
                 )
         except asyncio.TimeoutError:
             # The user didn't submit the modal in the specified period of time.
@@ -184,7 +192,7 @@ async def upscale(
             'imageurl': imageurl,
             'userid': author.mention,
             'channelid': inter.channel_id,
-            'sampler': vars['sampler'],
+            'sampler': 'k_euler_a',
             'karras': True,
             'steps': 10,
             'source_image': source_image,
@@ -217,14 +225,14 @@ async def generate(
     inter: disnake.ApplicationCommandInteraction,
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
-    upscalers: str = commands.Param(choices=['RealESRGAN_x4plus', 'GFPGAN'], default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
+    upscalers: str = commands.Param(choices=processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
     model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: Stable Diffusion 2.1'),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     #imageurl: str = commands.Param(name = 'init_image', default = None, description='Initial image for img2img.'),
-    width: int = commands.Param(default = 768, le=1024, ge=64, description='Width of the final image. Default: 768'),
-    height: int = commands.Param(default = 768, le=1024, ge=64, description='Height of the final image. Default: 768'),    
-    sampler: str = commands.Param(default = 'k_dpm_2', description = 'ADVANCED: Which stable diffusion sampler to use. Default: k_dpm_2', choices=['k_lms', 'k_heun', 'k_euler', 'k_euler_a', 'k_dpm_2', 'k_dpm_2_a', 'k_dpm_fast', 'k_dpm_adaptive', 'k_dpmpp_2s_a', 'k_dpmpp_2m', 'dpmsolver']),
-    steps: int = commands.Param(default=10, le=35, ge=1, description='Greater: Higher Image Quality but takes longer. Default: 10'),
+    width: int = commands.Param(default = default_width, le=1024, ge=64, description='Width of the final image. Default: ' + str(default_width)),
+    height: int = commands.Param(default = default_height, le=1024, ge=64, description='Height of the final image. Default: ' + str(default_height)),    
+    sampler: str = commands.Param(default = default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + default_sampler, choices=sampler_list),
+    steps: int = commands.Param(default=default_steps, le=50, ge=1, description='Greater: Higher Image Quality but takes longer. Default: ' + str(default_steps)),
     seed: int = commands.Param(default=-1, description='Seed for the image.')
 ): 
     karras = True
@@ -245,11 +253,12 @@ async def generate(
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
     embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt', value=neg_prompt, inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
-    embed.add_field(name='Content Filter', value=str(nsfw), inline=True)
-    embed.add_field(name='Dimensions', value=str(width) + 'x' + str(height), inline=True)
+    embed.add_field(name='Model:', value=model, inline=True)
+    embed.add_field(name='Content Filter:', value=str(nsfw), inline=True)
+    embed.add_field(name='Dimensions:', value=str(width) + 'x' + str(height), inline=True)
     
     print(nsfw)
     
@@ -292,13 +301,13 @@ async def riff(
     inter: disnake.ApplicationCommandInteraction,
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
-    upscalers: str = commands.Param(choices=['RealESRGAN_x4plus', 'GFPGAN'], default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
+    upscalers: str = commands.Param(choices=processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
     model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: Stable Diffusion'),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     imageurl: str = commands.Param(name = 'init_image', description='Initial image for img2img.'),
     denoising_strength: int = commands.Param(name = 'image_guidance',le=100, ge=0, description = 'How much the image should match the provided, 100 = clone, 0 = no effect'),
-    sampler: str = commands.Param(default = 'k_dpm_2', description = 'ADVANCED: Which stable diffusion sampler to use. Default: k_dpm_2', choices=['k_lms', 'k_heun', 'k_euler', 'k_euler_a', 'k_dpm_2', 'k_dpm_2_a', 'k_dpm_fast', 'k_dpm_adaptive', 'k_dpmpp_2s_a', 'k_dpmpp_2m', 'dpmsolver']),
-    steps: int = commands.Param(default=10, le=35, ge=1, description='Greater: Higher Image Quality but takes longer. Default: 10'),
+    sampler: str = commands.Param(default = default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + default_sampler, choices=sampler_list),
+    steps: int = commands.Param(default=default_steps, le=50, ge=1, description='Greater: Higher Image Quality but takes longer. Default: ' + str(default_steps)),
     seed: int = commands.Param(default=-1, description='Seed for the image.'),
 ):
     denoising_strength = 1-denoising_strength/105
@@ -329,11 +338,12 @@ async def riff(
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
     embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt', value=neg_prompt, inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
-    embed.add_field(name='Content Filter', value=str(nsfw), inline=True)
-    embed.add_field(name='Dimensions', value=str(width) + 'x' + str(height), inline=True)
+    embed.add_field(name='Model:', value=model, inline=True)
+    embed.add_field(name='Content Filter:', value=str(nsfw), inline=True)
+    embed.add_field(name='Dimensions:', value=str(width) + 'x' + str(height), inline=True)
     print(nsfw)
     
     if use_embeds:
@@ -374,14 +384,15 @@ async def outpaint(
     inter: disnake.ApplicationCommandInteraction,
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
-    upscalers: str = commands.Param(choices=['RealESRGAN_x4plus', 'GFPGAN'], default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
-    model: str = commands.Param(default='stable_diffusion_inpainting',choices=model_list, description='Which model to generate the image with. Default: Stable Diffusion'),
+    upscalers: str = commands.Param(choices=processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     imageurl: str = commands.Param(name = 'init_image', description='Initial image for img2img.'),
-    sampler: str = commands.Param(default = 'k_dpm_2', description = 'ADVANCED: Which stable diffusion sampler to use. Default: k_dpm_2', choices=['k_lms', 'k_heun', 'k_euler', 'k_euler_a', 'k_dpm_2', 'k_dpm_2_a', 'k_dpm_fast', 'k_dpm_adaptive', 'k_dpmpp_2s_a', 'k_dpmpp_2m', 'dpmsolver']),
-    steps: int = commands.Param(default=10, le=35, ge=1, description='Greater: Higher Image Quality but takes longer. Default: 10'),
+    sampler: str = commands.Param(default = default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + default_sampler, choices=sampler_list),
+    steps: int = commands.Param(default=default_steps, le=50, ge=1, description='Greater: Higher Image Quality but takes longer. Default: ' + str(default_steps)),
     seed: int = commands.Param(default=-1, description='Seed for the image.'),
 ):
+    model = 'stable_diffusion_inpainting'
+    
     karras = True
     dm = False
     userid = inter.author.mention
@@ -408,11 +419,12 @@ async def outpaint(
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
     embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt', value=neg_prompt, inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
-    embed.add_field(name='Content Filter', value=str(nsfw), inline=True)
-    embed.add_field(name='Dimensions', value=str(width) + 'x' + str(height), inline=True)
+    embed.add_field(name='Model:', value=model, inline=True)
+    embed.add_field(name='Content Filter:', value=str(nsfw), inline=True)
+    embed.add_field(name='Dimensions:', value=str(width) + 'x' + str(height), inline=True)
     print(nsfw)
     
     if use_embeds:
@@ -472,14 +484,14 @@ async def url2base64(url):
             rounded_height = 0
 
             if width <= height:
-                rounded_width = 512
-                rounded_height = (height/width*512)
+                rounded_width = default_width
+                rounded_height = (height/width*default_width)
             else:
-                rounded_height = 512
-                rounded_width = (width/height*512)
-            
-            rounded_width = round(width / 64) * 64
-            rounded_height = round(height / 64) * 64
+                rounded_height = default_height
+                rounded_width = (width/height*default_width)
+
+            rounded_width = round(rounded_width / 64) * 64
+            rounded_height = round(rounded_height / 64) * 64
             rounded_width = min(max(rounded_width, 64), 1024)
             rounded_height = min(max(rounded_height, 64), 1024)
             image_resized = image.resize((rounded_width, rounded_height))
@@ -598,6 +610,15 @@ async def upscale_code(code, number):
 
 async def query_api(url, vars):
     global wait_time
+    
+    msg_channel = bot.get_channel(vars['channelid'])
+    if vars['dm']:
+        msg_channel = vars['author']
+        
+    if vars['model'] == 'Midjourney Diffusion' and not vars['prompt'].startswith('midjrny-v4 style'):
+        await msg_channel.send('Auto-adding \'midjrny-v4 style\' to start of prompt!')
+        vars['prompt'] = 'midjrny-v4 style ' + vars['prompt']
+    
     headers = {
     # Already added when you pass json= but not when you pass data=
     # 'Content-Type': 'application/json',
@@ -647,9 +668,6 @@ async def query_api(url, vars):
     done = False
     failed = False
     results = []
-    msg_channel = bot.get_channel(vars['channelid'])
-    if vars['dm']:
-        msg_channel = vars['author']
     message = await msg_channel.send('Querying job for user ' + vars['userid'])
     if not accept_dm:
         await message.edit('Sorry, but generating in DM\'s is disabled')
@@ -684,10 +702,13 @@ async def query_api(url, vars):
                         embed=disnake.Embed(title='Generating job!', color=0xf0e000)
                         embed.add_field(name='Finished:', value=str(gens['finished']), inline=True)
                         embed.add_field(name='Processing:', value=str(gens['processing']), inline=True)
-                        embed.add_field(name='Restarted:', value=str(gens['restarted']), inline=True)
+                        if int(gens['restarted'])>0:
+                            embed.add_field(name='Restarted:', value=str(gens['restarted']), inline=True)
                         embed.add_field(name='Waiting', value=str(gens['waiting']), inline=True)
                         embed.add_field(name='Content Filter:', value=str(vars['filter']), inline=True)
                         embed.add_field(name='Code(for debugging):', value='||' + codeid + '||', inline=True)
+                        if int(gens['queue_position']) > 1:
+                            embed.add_field(name='Queue Position:', value=str(gens['queue_position']), inline=True)
                         embed.set_image(file=disnake.File(filelocation))
                         
                         if use_embeds:
@@ -812,7 +833,7 @@ async def query_api(url, vars):
                     u7.callback = u7callback
                     u8.callback = u8callback
                     
-                    view = disnake.ui.View()
+                    view = disnake.ui.View(timeout=None)
                     
                     view.add_item(u1)
                     view.add_item(u2)
