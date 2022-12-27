@@ -1,4 +1,4 @@
-servermodels = False
+servermodels = True
 # If enabled, will fetch models from the server. If disabled, it will only
 # use models specified in the model_list
 
@@ -12,16 +12,28 @@ token = 'BOT_TOKEN_HERE'
 # discord bot token
 
 sd_api_key = '0000000000'
-# horde api key
+# default horde api key, optional but recommended
 
-nsfw_filter = True
+nsfw_filter = False
 # if disabled, will disable the NSFW filter on the bot. Note: If disabled,
 # it will only have the filter disabled in NSFW-marked channels
+
+default_sampler = 'k_euler_a'
+# default sampler for generations
 
 default_model = 'stable_diffusion'
 # default model for generations
 
-input_types = ('.png', '.jpg', '.jpeg', '.webp')
+default_width = 576
+default_height = 576
+# default width and height for generations, and when doing img2img,
+# the default_width will be used as the shorter edge of the image to
+# bring low resolution images up to a good img2img resolution
+
+default_steps = 15
+# default steps for generations
+
+input_types = ('.png', '.jpg', '.jpeg', '.webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
 img_type = '.webp'
 format_type = 'WEBP'
 # image file extension. Note: only PIL-supported types are supported right now.
@@ -41,12 +53,14 @@ save_nsfw = True
     
 url = 'https://stablehorde.net' # url to query
 endpoint = '/api/v2/generate/' # api async endpoint
-wait_time = 1 # time between asynchronous API calls, lower = more status information, 
+wait_time = 2 # time between asynchronous API calls, lower = more status information, 
               # higher = less bandwidth usage. Keep under 15 preferably
 
-timeout = 180
+timeout = 580
 # how long to wait before cancelling the request and sending images, keep below 600,
 # but precious kudos will be sacrificed if you set it too low
+
+showanywaytimeout = 100
 
 error_color = '#ff0000'
 nsfw_color = '#b449fb'
@@ -63,9 +77,16 @@ embed_icon = 'https://cdn.discordapp.com/avatars/963129050883325962/fc05c88bcc34
 filter_strength = 0.4
 # Strength of nsfw filter. 0 will allow all messages, 1 will allow no messages
 
+import json
+import requests
+
+print('Querying https://stablehorde.net/api/swagger.json This may take a minute.')
+apidocs = requests.get('https://stablehorde.net/api/swagger.json').json()
+
+sampler_list = apidocs['definitions']['ModelPayloadRootStable']['properties']['sampler_name']['enum']
+processor_list = apidocs['definitions']['ModelPayloadRootStable']['properties']['post_processing']['items']['enum']
+
 if servermodels:
-    import json
-    import requests
     headers = {
     'accept': 'application/json',
     }
