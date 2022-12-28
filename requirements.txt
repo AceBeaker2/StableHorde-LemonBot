@@ -1,9 +1,7 @@
 disnake
 asyncio
 aiohttp
-logging
 Pillow
 nsfw-detector
 urllib3
-AST
 requests
