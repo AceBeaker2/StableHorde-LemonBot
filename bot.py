@@ -30,7 +30,6 @@ bot = commands.Bot(
     command_prefix=disnake.ext.commands.when_mentioned,
     )
 
-
 @bot.event
 async def on_ready():
     print('The bot is ready!')
@@ -66,9 +65,9 @@ async def upscale(
     
         view = disnake.ui.View(timeout=None)
     
-        moreinfo = disnake.ui.Button(label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
-        variate = disnake.ui.Button(label='Make Variations', style=disnake.ButtonStyle.green)
-        outpaint = disnake.ui.Button(label='Outpaint', style=disnake.ButtonStyle.green)
+        moreinfo = disnake.ui.Button(custom_id='info', label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
+        variate = disnake.ui.Button(custom_id='variate', label='Make Variations', style=disnake.ButtonStyle.green)
+        outpaint = disnake.ui.Button(custom_id='outpaint', label='Outpaint', style=disnake.ButtonStyle.green)
     
     except:
         embed = disnake.Embed('Upscale Failed!', color=0xff0000)
@@ -80,8 +79,8 @@ async def upscale(
         
         embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
         embed.add_field(name='Sampler:', value=vars['sampler'], inline=False)
-        embed.add_field(name='Prompt:', value=vars['prompt'], inline=False)
-        embed.add_field(name='Negative Prompt:', value=vars['neg_prompt'], inline=False)
+        embed.add_field(name='Prompt:', value=vars['prompt'][:1024], inline=False)
+        embed.add_field(name='Negative Prompt:', value=vars['neg_prompt'][:1024], inline=False)
         embed.add_field(name='Model:', value=vars['model'], inline=False)
         embed.add_field(name='Content Filter', value=str(vars['filter']), inline=False)
         embed.add_field(name='CFG Scale:', value=vars['cfg_scale'], inline=False)
@@ -226,7 +225,7 @@ async def generate(
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
-    model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: Stable Diffusion 2.1'),
+    model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: ' + str(default_model)),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     #imageurl: str = commands.Param(name = 'init_image', default = None, description='Initial image for img2img.'),
     width: int = commands.Param(default = default_width, le=1024, ge=64, description='Width of the final image. Default: ' + str(default_width)),
@@ -252,8 +251,8 @@ async def generate(
     embed=disnake.Embed(title='Generation queued with following parameters:', color=0xf0e000)
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
-    embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
+    embed.add_field(name='Prompt:', value=prompt[:512], inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt[:512], inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
     embed.add_field(name='Model:', value=model, inline=True)
@@ -267,6 +266,8 @@ async def generate(
     else:
         user_response = 'Generating with following parameters:\nPrompt: ```' + prompt + '```Negative Prompt: ```' + neg_prompt + '```CFG Scale: ```' + str(cfg_scale) + '```Steps: ```' + str(steps) + '```for ' + userid + '. Please be patient'
         await inter.response.send_message(user_response) 
+    
+    inter_response = await inter.original_response() 
     
     vars = {
         'prompt': prompt,
@@ -290,6 +291,7 @@ async def generate(
         'author': inter.author,
         'denoising_strength': 0.75,
         'seed': seed,
+        'inter_response': inter_response,
         }
     global url
     global endpoint
@@ -302,7 +304,7 @@ async def riff(
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
-    model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: Stable Diffusion'),
+    model: str = commands.Param(default=default_model,choices=model_list, description='Which model to generate the image with. Default: ' + str(default_model)),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     imageurl: str = commands.Param(name = 'init_image', description='Initial image for img2img.'),
     denoising_strength: int = commands.Param(name = 'image_guidance',le=100, ge=0, description = 'How much the image should match the provided, 100 = clone, 0 = no effect'),
@@ -331,14 +333,12 @@ async def riff(
     except:
         await inter.response.send_message('Error, URL invalid. Please try another image', ephemeral=True)  
         return
-    if neg_prompt == 'ugly, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, mutation, mutated, extra limbs, extra legs, extra arms, disfigured, deformed, cross-eye, body out of frame, blurry, bad art, bad anatomy, blurred, text, watermark, grainy' and not 'stable' in model:
-        neg_prompt = 'a'
     
     embed=disnake.Embed(title='img2img generation queued with following parameters:', color=0xf0e000)
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
-    embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
+    embed.add_field(name='Prompt:', value=prompt[:512], inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt[:512], inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
     embed.add_field(name='Model:', value=model, inline=True)
@@ -351,6 +351,8 @@ async def riff(
     else:
         user_response = 'Generating with following parameters:\nPrompt: ```' + prompt + '```Negative Prompt: ```' + neg_prompt + '```CFG Scale: ```' + str(cfg_scale) + '```Steps: ```' + str(steps) + '```for ' + userid + '. Please be patient'
         await inter.response.send_message(user_response) 
+        
+    inter_response = await inter.original_response() 
     
     vars = {
         'prompt': prompt,
@@ -374,6 +376,7 @@ async def riff(
         'author': inter.author,
         'denoising_strength': denoising_strength,
         'seed': seed,
+        'inter_response': inter_response,
         }
     global url
     global endpoint
@@ -418,8 +421,8 @@ async def outpaint(
     embed=disnake.Embed(title='Outpainting generation queued with following parameters:', color=0xf0e000)
     embed.set_author(name='Your generation request is on its way!')
     embed.set_thumbnail(url=embed_icon)
-    embed.add_field(name='Prompt:', value=prompt, inline=False)
-    embed.add_field(name='Negative Prompt:', value=neg_prompt, inline=False)
+    embed.add_field(name='Prompt:', value=prompt[:512], inline=False)
+    embed.add_field(name='Negative Prompt:', value=neg_prompt[:512], inline=False)
     embed.add_field(name='CFG Scale:', value=cfg_scale, inline=True)
     embed.add_field(name='Steps:', value=steps, inline=True)
     embed.add_field(name='Model:', value=model, inline=True)
@@ -432,6 +435,8 @@ async def outpaint(
     else:
         user_response = 'Generating with following parameters:\nPrompt: ```' + prompt + '```Negative Prompt: ```' + neg_prompt + '```CFG Scale: ```' + str(cfg_scale) + '```Steps: ```' + str(steps) + '```for ' + userid + '. Please be patient'
         await inter.response.send_message(user_response) 
+    
+    inter_response = await inter.original_response() 
     
     vars = {
         'prompt': prompt,
@@ -455,6 +460,7 @@ async def outpaint(
         'author': inter.author,
         'denoising_strength': 0.75,
         'seed': seed,
+        'inter_response': inter_response,
         }
     global url
     global endpoint
@@ -787,17 +793,16 @@ async def query_api(url, vars):
                     results.append(error_image)
                 finalgrid = await make_grid(results)
                 finalgrid.save('imagecache/' + codeid + img_type)
-                button = disnake.ui.Button()
                 
                 if use_embeds:
-                    u1 = disnake.ui.Button(label='U1', style=disnake.ButtonStyle.blurple, row=0)
-                    u2 = disnake.ui.Button(label='U2', style=disnake.ButtonStyle.blurple, row=0)
-                    u3 = disnake.ui.Button(label='U3', style=disnake.ButtonStyle.blurple, row=0)
-                    u4 = disnake.ui.Button(label='U4', style=disnake.ButtonStyle.blurple, row=0)
-                    u5 = disnake.ui.Button(label='U5', style=disnake.ButtonStyle.blurple, row=1)
-                    u6 = disnake.ui.Button(label='U6', style=disnake.ButtonStyle.blurple, row=1)
-                    u7 = disnake.ui.Button(label='U7', style=disnake.ButtonStyle.blurple, row=1)
-                    u8 = disnake.ui.Button(label='U8', style=disnake.ButtonStyle.blurple, row=1)
+                    u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0)
+                    u2 = disnake.ui.Button(custom_id='u2', label='U2', style=disnake.ButtonStyle.blurple, row=0)
+                    u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=0)
+                    u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=0)
+                    u5 = disnake.ui.Button(custom_id='u5', label='U5', style=disnake.ButtonStyle.blurple, row=1)
+                    u6 = disnake.ui.Button(custom_id='u6', label='U6', style=disnake.ButtonStyle.blurple, row=1)
+                    u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=1)
+                    u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=1)
                     
                     async def u1callback(interaction):
                         await upscale(interaction, number=1, code=codeid)
@@ -851,7 +856,8 @@ async def query_api(url, vars):
                     embed.add_field(name='Filtered images:', value=str(filtered_images), inline=True)
                     embed.add_field(name='Code(for debugging):', value='||' + codeid + '||', inline=True)
                     embed.set_image(file=disnake.File('imagecache/' + codeid + img_type))
-                    await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
+                    await message.delete()
+                    await vars['inter_response'].reply('Job done for user ' + vars['userid'], embed=embed, view=view)
                 else:
                     await message.edit(file=disnake.File('imagecache/' + codeid + img_type))
 
