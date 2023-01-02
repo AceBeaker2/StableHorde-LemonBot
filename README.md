@@ -5,6 +5,17 @@
 - Async functionality
 - Slash commands, buttons and modals!
 - Error reporting to end user
+- Highly-Customizable generation commands
+- Text2Image, Image2Image, and rudimentary outpainting
+- Easy setup and config editing
+
+#### TODO:
+- Less boilerplate code
+- Interpolation commands
+- Buttons for face upscaling, and super-resolution upscaling
+- API key linking
+- Public app directory instance
+- Prompt-Video AI maybe???
 
 ##### Prerequisites:
 - [git](https://git-scm.com/downloads)
