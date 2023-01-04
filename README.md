@@ -10,6 +10,7 @@
 - Easy setup and config editing
 
 #### TODO:
+- CLIP interrogator(somewhat working)
 - Less boilerplate code
 - Interpolation commands
 - Buttons for face upscaling, and super-resolution upscaling
