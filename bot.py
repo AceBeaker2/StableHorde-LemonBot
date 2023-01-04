@@ -10,14 +10,14 @@ import aiohttp
 import time
 import logging
 from PIL import Image, ImageDraw
-import os
 from nsfw_detector import predict
 import base64
 import io
 from urllib.parse import urlparse
-import json
 import ast
-import math
+
+import os
+import json
 
 model = predict.load_model('./checker.h5')
 # gets model
@@ -51,31 +51,34 @@ async def upscale(
         await inter.response.send_message('Image not found', ephemeral=True)
         return
 
-    number = number - 1    
+    await inter.response.defer(with_message=True)
+
+    number -= 1    
     filepath = await upscale_code(code, number)
     
     with open('textcache/' + code + '.txt', 'r') as f:
         text = f.read()
         vars = ast.literal_eval(text)
     
-    try:
-        embed=disnake.Embed(title='Upscale Done!', color=0xadd8e6)
-        embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
-        embed.set_image(file=disnake.File(filepath))
+    #try:
+    color = await average_color(filepath)
+    embed=disnake.Embed(title='Upscale Done!', color=color)
+    embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
+    embed.set_image(file=disnake.File(filepath))
+
+    view = disnake.ui.View(timeout=None)
+
+    moreinfo = disnake.ui.Button(custom_id='info', label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
+    variate = disnake.ui.Button(custom_id='variate', label='Make Variations', style=disnake.ButtonStyle.green)
+    outpaint = disnake.ui.Button(custom_id='outpaint', label='Outpaint', style=disnake.ButtonStyle.green)
     
-        view = disnake.ui.View(timeout=None)
-    
-        moreinfo = disnake.ui.Button(custom_id='info', label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔')
-        variate = disnake.ui.Button(custom_id='variate', label='Make Variations', style=disnake.ButtonStyle.green)
-        outpaint = disnake.ui.Button(custom_id='outpaint', label='Outpaint', style=disnake.ButtonStyle.green)
-    
-    except:
-        embed = disnake.Embed('Upscale Failed!', color=0xff0000)
-        
-        view = disnake.ui.View()
+    #except:
+    #    embed = disnake.Embed('Upscale Failed!', color=0xff0000)
+    #    
+    #    view = disnake.ui.View()
     
     async def infocallback(interaction):
-        embed=disnake.Embed(title='Status Sheet', color=0xf0e000)
+        embed=disnake.Embed(title='Status Sheet', color=color)
         
         embed.add_field(name='Seed:', value=vars[str(number)]['seed'], inline=False)
         embed.add_field(name='Sampler:', value=vars['sampler'], inline=False)
@@ -87,7 +90,7 @@ async def upscale(
         embed.add_field(name='Steps:', value=str(vars['steps']), inline=False)
         embed.add_field(name='Dimensions:', value=str(vars['width']) + 'x' + str(vars['height']), inline=False)
         embed.add_field(name='Upscaler:', value=str(vars['upscalers']), inline=False)
-        embed.add_field(name='Author:', value=str(vars['author']), inline=False)
+        embed.add_field(name='Author:', value='<@'+str(vars['author'])+'>', inline=False)
         
         embed.set_image(file=disnake.File(filepath))
         await interaction.send(embed=embed)
@@ -105,7 +108,9 @@ async def upscale(
         source_image, width, height = image_info
 
         author = interaction.user
-            
+
+        inter_response = await inter.original_response()         
+        
         vvars = {
              'prompt': vars['prompt'],
              'neg_prompt': vars['neg_prompt'],
@@ -128,6 +133,7 @@ async def upscale(
              'author': author,
              'denoising_strength': 0.8,
              'seed': -1,
+             'inter_response': inter_response,
              }
         await query_api(url + endpoint, vvars)
     
@@ -180,6 +186,9 @@ async def upscale(
             # This is done since Discord doesn't dispatch any event for when a modal is closed/dismissed.
             return
         await modal_inter.response.send_message('Outpaint request is on its way!')
+        
+        inter_response = await modal_inter.original_response() 
+        
         ovars = {
             'prompt': modal_inter.text_values['prompt'],
             'neg_prompt': modal_inter.text_values['neg_prompt'],
@@ -202,6 +211,7 @@ async def upscale(
             'author': inter.author,
             'denoising_strength': 0.75,
             'seed': -1,
+            'inter_response': inter_response,
             }
         global url
         global endpoint
@@ -215,7 +225,7 @@ async def upscale(
     view.add_item(outpaint)
     view.add_item(moreinfo)
     
-    await inter.response.send_message(embed=embed, view=view) 
+    await inter.edit_original_message(embed=embed, view=view) 
     message = await inter.original_message()
     imageurl = message.embeds[0].image.url
     
@@ -552,9 +562,46 @@ async def url2mask(url):
             mask_string = base64.b64encode(bytesio.read()).decode()
             
             return [image_string, mask_string, rounded_width, rounded_height]
+
+async def average_color(path):
+    im = Image.open(path)
+    
+    width, height = im.size
+    
+    im = im.resize((width//16, height//16))
+    
+    width, height = im.size
+    
+    pixels = list(im.getdata())
+    n = len(pixels)
+    r_sum = g_sum = b_sum = 0
+    for pixel in pixels:
+        r, g, b = pixel
+        r_sum += r
+        g_sum += g
+        b_sum += b
         
+    average_color = (r_sum//n, g_sum//n, b_sum//n)
+    
+    high = max(average_color)
+    low = min(average_color)
+    average_color = tuple([min(255, max(0, x + (-100 if x == low else 100 if x == high else 0))) for x in average_color])
+    
+    return (average_color[0] << 16) + (average_color[1] << 8) + average_color[2]
 
 async def shade_cells(width, height, gens):
+    rounded_width = rounded_height = 0
+
+    if width <= height:
+        rounded_width = 512
+        rounded_height = (height/width*512)
+    else:
+        rounded_height = 512
+        rounded_width = (width/height*512)
+        
+    width = round(rounded_width)
+    height = round(rounded_height)
+    
     dst = Image.new('RGB', (width*4, height*2))
     draw = ImageDraw.Draw(dst)
     
@@ -598,20 +645,23 @@ async def shade_cells(width, height, gens):
     return 'waitcache/' + imagename
     
 async def upscale_code(code, number):
-    img = Image.open('imagecache/' + code + img_type)    
-    if number > 3:
-        top = img.height/2
-    else:
-        top = 0
-        
-    bottom = top + (img.height/2)
+    filepath = 'upscalecache/' + code + '_' + str(number) + img_type
+    if not os.path.isfile(filepath):
+        img = Image.open('imagecache/' + code + img_type)    
+        if number > 3:
+            top = img.height/2
+        else:
+            top = 0
+            
+        bottom = top + (img.height/2)
+            
+        left = (img.width/4) * (number % 4)
+        right = left + (img.width/4)
+        print(left, top, right, bottom)
+        img = img.crop((left, top, right, bottom))
     
-    left = (img.width/4) * (number % 4)
-    right = left + (img.width/4)
-    print(left, top, right, bottom)
-    img = img.crop((left, top, right, bottom))
-    img.save('upscalecache/' + code + '_' + str(number) + img_type)
-    return 'upscalecache/' + code + '_' + str(number) + img_type
+        img.save(filepath)
+    return filepath
 
 
 async def query_api(url, vars):
@@ -661,6 +711,10 @@ async def query_api(url, vars):
         'source_processing': vars['source_processing'],
           }
     
+    if vars['upscalers'] == 'RealESRGAN_x4plus':
+        vars['width'] *= 4
+        vars['height'] *= 4
+    
     if not vars['source_image'] == None:
         json_data.update({'source_image': vars['source_image']})
         
@@ -705,7 +759,9 @@ async def query_api(url, vars):
                         
                         filelocation = await shade_cells(vars['width'], vars['height'], gens)
                         
-                        embed=disnake.Embed(title='Generating job!', color=0xf0e000)
+                        color = await average_color(filelocation)
+                        
+                        embed=disnake.Embed(title='Generating job!', color=color)
                         embed.add_field(name='Finished:', value=str(gens['finished']), inline=True)
                         embed.add_field(name='Processing:', value=str(gens['processing']), inline=True)
                         if int(gens['restarted'])>0:
@@ -748,6 +804,7 @@ async def query_api(url, vars):
             udata = {}
             
             filtered_images = 0
+            filtered_list = []
             if rstatus == 200 and hasattr(response, 'json'):
                 
                 rawjson = await response.json()
@@ -769,16 +826,17 @@ async def query_api(url, vars):
                             print('Check clear!')
                             os.remove(imgname)
                         else:
+                            width, height = img.size
                             print('nsfw filtered')
                             filtered_images += 1
-                            img = Image.new(mode = 'RGB', size = (vars['width'], vars['height']),color = nsfw_color)
+                            filtered_list.append(counter)
+                            img = Image.new(mode = 'RGB', size = (width, height),color = nsfw_color)
                             if not save_nsfw:
                                 os.remove(imgname)
                         
                     results.append(img)
                     counter += 1
                 
-                udata.update(vars)
                 errors = 8-len(results)
                 error_image = Image.new(mode='RGB', size=(vars['width'], vars['height']), color = error_color)
                 
@@ -786,9 +844,12 @@ async def query_api(url, vars):
                 print(author.id)
                 vars.update({'author': author.id})
                 udata.update(vars)
+                
+                udata.pop('inter_response')
+                
                 with open('textcache/' + codeid + '.txt', 'w') as f:
                     f.write(str(udata)) # .replace('\'', '"')
-                
+                                
                 for i in range(8):
                     results.append(error_image)
                 finalgrid = await make_grid(results)
@@ -849,8 +910,9 @@ async def query_api(url, vars):
                     view.add_item(u7)
                     view.add_item(u8)
                     
+                    color = await average_color('imagecache/' + codeid + img_type)
                     
-                    embed=disnake.Embed(title='Job Complete!', color=0x00ff40)
+                    embed=disnake.Embed(title='Job Complete!', color=color)
                     embed.add_field(name='Content Filter:', value=str(vars['filter']), inline=True)
                     embed.add_field(name='Images timed out:', value=str(errors), inline=True)
                     embed.add_field(name='Filtered images:', value=str(filtered_images), inline=True)
