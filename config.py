@@ -79,6 +79,15 @@ filter_strength = 0.4
 
 import json
 import requests
+import os
+
+directories = ['textcache', 'upscalecache', 'nsfwcache', 'waitcache', 'imagecache']
+# define directories
+
+for path in directories:
+    if not os.path.isdir(path):
+        os.mkdir(path)
+# loops through directories, if they don't exist, it makes them
 
 print('Querying https://stablehorde.net/api/swagger.json This may take a minute.')
 apidocs = requests.get('https://stablehorde.net/api/swagger.json').json()
