@@ -8,14 +8,15 @@ model_list = ['stable_diffusion', 'Midjourney Diffusion', 'Furry Epoch', 'Yiffy'
 # note that only stable horde models will work. Find this list at
 # https://stablehorde.net/api/v2/status/models
 
-token = 'MTA1NTk4NDY1NDc0Mzc3NzM5Mg.G2-3oI.lMiWqQ1vBy6xP9H2AtktOtPaZxaa-0RSA66Pak'
+token = 'BOT_TOKEN_HERE'
 # discord bot token
+
+sd_api_key = '0000000000'
+# horde api key, planning to add /link, and /unlink
 
 default_images = 4
 # amount of images to generate on default, must be one of [1,2,4,6,8,9]
 
-sd_api_key = '0000000000'
-# horde api key, planning to add /link, and /unlink
 
 nsfw_filter = False
 # if disabled, will disable the NSFW filter on the bot. Note: If disabled,
