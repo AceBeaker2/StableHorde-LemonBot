@@ -49,7 +49,7 @@ async def caption(
     inter: disnake.ApplicationCommandInteraction,
     image: disnake.Attachment = commands.Param(description='Image to caption'),
     ):
-    if not str(image.content_type) == image.content_type or not image.content_type.endswith(settings.input_types):
+    if not str(image.content_type) == image.content_type or not image.content_type.endswith(settings.media_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -460,7 +460,7 @@ async def riff(
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
 ):
-    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.media_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -552,7 +552,7 @@ async def outpaint(
 ):
     model = 'stable_diffusion_inpainting'
     
-    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.media_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
