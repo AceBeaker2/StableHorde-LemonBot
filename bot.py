@@ -17,6 +17,11 @@ import ast
 import os
 import json
 
+try:
+    import intents
+except:
+    print('ERROR: CP checker not imported')
+
 model = predict.load_model('./checker.h5')
 # gets model
 
@@ -38,7 +43,62 @@ async def config(inter):
     embed.set_image(url='https://i.imgur.com/QLT48xE.png')
     
     await inter.response.send_message(embed=embed)
+
+@bot.slash_command(description='Caption image with CLIP interrogator')
+async def caption(
+    inter: disnake.ApplicationCommandInteraction,
+    image: disnake.Attachment = commands.Param(description='Image to caption'),
+    ):
+    if not str(image.content_type) == image.content_type or not image.content_type.endswith(settings.input_types):
+        await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
+        return
     
+    await inter.response.defer(with_message = True)
+    
+    image_bytes = await image.read()
+    base64_bytes = base64.b64encode(image_bytes)
+    base64_string = base64_bytes.decode('utf-8')
+    
+    json_data = {
+  "forms": [{"name": "caption",}],
+      "source_image": base64_string}
+    
+    headers = {
+    # Already added when you pass json= but not when you pass data=
+    # 'Content-Type': 'application/json',
+        'apikey': settings.sd_api_key,
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post('https://stablehorde.net/api/v2/interrogate/async', json=json_data, headers=headers) as response:
+                rawjson = await response.json()
+                print(str(rawjson))
+                id = rawjson['id']
+                
+            await asyncio.sleep(5)
+            done = False
+                
+            while not done:
+                response = await session.get('https://stablehorde.net/api/v2/interrogate/status/' + id)
+                jsondata = await response.json()
+                print('jsondata, I am your father:' + str(jsondata))
+                try:
+                    done = jsondata['state'] == 'done'
+                except:
+                    done = False
+                await asyncio.sleep(settings.wait_time)
+                
+        buffer = io.BytesIO(image_bytes)
+        buffer.seek(0)
+        color = await average_color(Image.open(buffer))
+        embed = disnake.Embed(title='Image Captioned!', color=color)
+        embed.set_thumbnail(url=image.url)
+        embed.add_field(name='Caption:', value=jsondata['forms'][0]['result']['caption'], inline=False)
+        await inter.send('Interrogation done for ' + inter.author.mention + '!', embed=embed)
+    except:
+        await inter.send('Interrogation failed', ephemeral=True)
+
 @bot.slash_command(description='Alternate upscale endpoint if the buttons don\'t work')
 async def upscale(
     inter: disnake.ApplicationCommandInteraction,
@@ -312,7 +372,7 @@ async def generate(
     sampler: str = commands.Param(default = settings.default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + settings.default_sampler, choices=settings.sampler_list),
     steps: int = commands.Param(default=settings.default_steps, le=50, ge=1, description='Greater: Higher Image Quality but takes longer. Default: ' + str(settings.default_steps)),
     seed: int = commands.Param(default=-1, description='Seed for the image.'),
-    amount: int = commands.Param(default=settings.default_images, choices = [1,2,4,6,8,9], description='Amount of images to generate. Defaul' + 't: False' + str(settings.default_images)),
+    amount: int = commands.Param(default=settings.default_images, choices = [1,2,4,6,8,9], description='Amount of images to generate. Default: ' + str(settings.default_images)),
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
 ): 
@@ -385,9 +445,9 @@ async def generate(
 
 @bot.slash_command(description='Generates images using Stable Horde img2img!')
 async def riff(
-    init_image: disnake.Attachment,
     inter: disnake.ApplicationCommandInteraction,
-    prompt: str = commands.Param(description='What the AI-generated image should be of.'),
+    init_image: disnake.Attachment = commands.Param(description='Initial Image'),
+    prompt: str = commands.Param(description='Command for the AI, e.g. \'Make her hair green\''),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=settings.processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
     model: str = commands.Param(default=settings.default_riff,choices=settings.model_list, description='Which model to generate the image with. Default: ' + str(settings.default_riff)),
@@ -400,10 +460,7 @@ async def riff(
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
 ):
-    if not str(init_image.content_type) == init_image.content_type:
-        await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
-        return
-    elif not init_image.content_type.endswith(settings.input_types):
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -480,9 +537,9 @@ async def riff(
 
 @bot.slash_command(description='Outpaints images using Stable Horde outpainting!')
 async def outpaint(
-    init_image: disnake.Attachment,
     inter: disnake.ApplicationCommandInteraction,
-    prompt: str = commands.Param(description='What the AI-generated image should be of.'),
+    init_image: disnake.Attachment = commands.Param(description='Initial Image'),
+    prompt: str = commands.Param(description='Description of the ideal image'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=settings.processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
@@ -495,10 +552,7 @@ async def outpaint(
 ):
     model = 'stable_diffusion_inpainting'
     
-    if not str(init_image.content_type) == init_image.content_type:
-        await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
-        return
-    elif not init_image.content_type.endswith(settings.input_types):
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -739,7 +793,10 @@ async def url2mask(url):
             return [image_string, mask_string, rounded_width, rounded_height]
 
 async def average_color(path):
-    im = Image.open(path)
+    try:
+        im = Image.open(path)
+    except:
+        im = path
     
     width, height = im.size
     
@@ -865,14 +922,22 @@ async def url_to_pil(url):
 
 
 async def query_api(url, vars, interaction):
+    msg_channel = bot.get_channel(vars['channelid'])
+    if vars['dm']:
+        msg_channel = vars['author']
+    try:
+        checkprompt = intents.check_cp(vars['prompt'])
+        checknegprompt = intents.check_cp(vars['neg_prompt'])
+    
+        if checkprompt[0] or checknegprompt[0]:
+            await msg_channel.send(vars['userid'] +', Suspected Child Porn prompt has been blocked and reported. If repeated multiple times, risk being banned.')
+            return
+    except:
+        print('WARNING: Unfiltered Prompt')
     try:
         amount = vars['amount']
     except:
         amount = settings.default_images
-
-    msg_channel = bot.get_channel(vars['channelid'])
-    if vars['dm']:
-        msg_channel = vars['author']
         
     if vars['model'] == 'Midjourney Diffusion' and not vars['prompt'].startswith('midjrny-v4 style'):
         await msg_channel.send('Auto-adding \'midjrny-v4 style\' to start of prompt!')

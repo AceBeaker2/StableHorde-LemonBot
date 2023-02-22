@@ -5,3 +5,4 @@ Pillow
 nsfw-detector
 urllib3
 requests
+word-forms

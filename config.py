@@ -8,7 +8,7 @@ model_list = ['stable_diffusion', 'Midjourney Diffusion', 'Furry Epoch', 'Yiffy'
 # note that only stable horde models will work. Find this list at
 # https://stablehorde.net/api/v2/status/models
 
-token = 'BOT_TOKEN_HERE'
+token = 'MTA1NTk4NDY1NDc0Mzc3NzM5Mg.G0O528.4aQPpGc6dhf8pMmHSfj7xppaaFsviBspW6BUdo'
 # discord bot token
 
 sd_api_key = '0000000000'
@@ -79,7 +79,7 @@ waiting_color = '#c300d1'
 embed_icon = 'https://cdn.discordapp.com/avatars/963129050883325962/fc05c88bcc34d50fb6767372e6946132.png'
 # Icon used on the initial embed!
 
-filter_strength = 0.4
+filter_strength = 0.3
 # Strength of nsfw filter. 0 will allow all messages, 1 will allow no messages
 
 thinking_emoji = '🤔'
