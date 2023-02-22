@@ -10,28 +10,29 @@
 - Easy setup and config editing
 
 #### TODO:
-- CLIP interrogator(somewhat working)
-- Less boilerplate code
-- Interpolation commands
-- Buttons for face upscaling, and super-resolution upscaling
-- API key linking
-- Public app directory instance
-- Prompt-Video AI maybe???
+- [x] CLIP interrogator(somewhat working)
+- [ ] Less boilerplate code
+- [ ] Interpolation commands
+- [x] Buttons for face upscaling, and super-resolution upscaling(Facial Redo working)
+- [ ] API key linking
+- [ ] Public app directory instance/top.gg
+- [ ] Prompt-Video AI maybe???
 
 ##### Prerequisites:
 - [git](https://git-scm.com/downloads)
 - [Python 3](https://www.python.org/downloads/)
+- [pip](https://pip.pypa.io/en/stable/installation/)
 
 #### Installation(Linux/MacOS):
 Open your favorite Terminal and run these commands.
 (Note: you need to get a discord bot token, and a stable horde api token(optional))
-```sh
+```bash
 git clone https://github.com/AceBeaker2/StableHorde-LemonBot
 cd StableHorde-LemonBot
 pip install -r requirements.txt
 ```
 Now head on over to config.py and input your keys. Then simply run:
-```sh
+```bash
 python3 bot.py
 ```
 and you should be good to go!
@@ -39,13 +40,13 @@ and you should be good to go!
 #### Installation(Windows):
 Open Command Prompt and run these commands.
 (Note: you need to get a discord bot token, and a stable horde api token(optional))
-```sh
+```powershell
 git clone https://github.com/AceBeaker2/StableHorde-LemonBot
 cd StableHorde-LemonBot
 python -m pip install -r requirements.txt
 ```
 Now head on over to config.py and input your keys. Then simply run:
-```sh
+```powershell
 python bot.py
 ```
 and you should be good to go!
@@ -54,4 +55,4 @@ and you should be good to go!
 
 Apache V2
 
-**Maintain a balanced and healthy diet of at least 30 lemons/day**
+**Maintain a balanced and healthy diet of at least 31 lemons/day**
