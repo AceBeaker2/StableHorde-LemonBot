@@ -8,6 +8,7 @@
 - Highly-Customizable generation commands
 - Text2Image, Image2Image, and rudimentary outpainting
 - Easy setup and config editing
+- Prompt Filtering to prevent CP/abuse
 
 #### TODO:
 - [x] CLIP interrogator(somewhat working)
@@ -55,4 +56,4 @@ and you should be good to go!
 
 Apache V2
 
-**Maintain a balanced and healthy diet of at least 31 lemons/day**
+**Maintain a balanced and healthy diet of at least 32 lemons/day**
