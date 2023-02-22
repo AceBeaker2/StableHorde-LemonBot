@@ -2,7 +2,7 @@ import disnake
 from typing import Optional
 from disnake.ext import commands
 import config as settings
-import nest_asyncio
+#import nest_asyncio
 # above line is weird spyder workaround. DW about it.
 import asyncio
 import aiohttp
@@ -26,7 +26,7 @@ model = predict.load_model('./checker.h5')
 # gets model
 
 logging.basicConfig(level=logging.INFO)
-nest_asyncio.apply()
+#nest_asyncio.apply()
 # weird spyder thing I don't get it
 
 bot = commands.Bot(
