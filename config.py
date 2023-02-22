@@ -1,3 +1,9 @@
+token = 'BOT_TOKEN_HERE'
+# discord bot token
+
+sd_api_key = '0000000000'
+# horde api key, planning to add /link, and /unlink
+
 servermodels = True
 # If enabled, will fetch models from the server. If disabled, it will only
 # use models specified in the model_list
@@ -7,12 +13,6 @@ model_list = ['stable_diffusion', 'Midjourney Diffusion', 'Furry Epoch', 'Yiffy'
 # Use this if you want to limit usable models on the bot, but
 # note that only stable horde models will work. Find this list at
 # https://stablehorde.net/api/v2/status/models
-
-token = 'MTA1NTk4NDY1NDc0Mzc3NzM5Mg.G0O528.4aQPpGc6dhf8pMmHSfj7xppaaFsviBspW6BUdo'
-# discord bot token
-
-sd_api_key = '0000000000'
-# horde api key, planning to add /link, and /unlink
 
 default_images = 4
 # amount of images to generate on default, must be one of [1,2,4,6,8,9]
@@ -38,7 +38,21 @@ default_height = 768
 default_steps = 23
 # default steps for generations
 
-input_types = ('png', 'jpg', 'jpeg', 'webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
+accept_dm = True
+# whether to accept requests in the DMs
+
+save_nsfw = True
+# if set to true, nsfw-filtered images will be saved in nsfwcache.
+
+# =======================
+# ADVANCED SETTINGS:
+# =======================
+
+url = 'https://stablehorde.net' # url to query
+endpoint = '/api/v2/generate/' # api async endpoint
+
+input_types = ('.png', '.jpg', '.jpeg', '.webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
+media_types = ('png', 'jpg', 'jpeg', 'webp',)
 img_type = '.webp'
 format_type = 'WEBP'
 # image file extension. Note: only PIL-supported types are supported right now.
@@ -46,18 +60,8 @@ format_type = 'WEBP'
 use_embeds = True
 # whether to use embeds to response to the user
 # Idk why this is still here, pliss don't touch it
-# I stopped actually making responses without embeds
+# I stopped actually making responses without embeds    
 
-accept_dm = True
-# whether to accept requests in the DMs
-
-save_nsfw = True
-# if set to true, nsfw-filtered images will be saved in nsfwcache.
-
-# ADVANCED SETTINGS:
-    
-url = 'https://stablehorde.net' # url to query
-endpoint = '/api/v2/generate/' # api async endpoint
 wait_time = 2 # time between asynchronous API calls, lower = more status information, 
               # higher = less bandwidth usage. Keep under 15 preferably
 
