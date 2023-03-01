@@ -1,8 +1,6 @@
 young
 20yo
 youthful
-9
-sixteen
 4yo
 son
 ballet
@@ -16,7 +14,6 @@ young-looking
 school
 underage
 neoteny
-6
 kinder
 ortega
 emerging
@@ -25,13 +22,11 @@ child
 femgirl
 thirteen
 18yo
-14
 newbie
 minor
 juvenile
 nymphet
 blooming
-eleven
 toddler
 unsophisticated
 untried
@@ -45,17 +40,9 @@ five
 lolipop
 12
 childlike
-six
-5
-11
-nineteen
 little
-4
 highschool
 tender
-16
-four
-19
 nigga
 prepubescent
 loli
@@ -64,8 +51,6 @@ girl
 thunberg
 19yo
 prettylittlething
-fourteen
-fifteen
 park
 inexperienced
 5yo
@@ -76,13 +61,10 @@ playground
 10yo
 jenna
 bobby
-7
 small
-18
 lollipop
 17yo
 boy
-13
 nig
 16yo
 15yo
@@ -92,12 +74,9 @@ twelve
 cherubic
 children
 girly
-17
 7yo
 8yo
-seventeen
 12yo
-15
 kid
 pubescent
 naif
@@ -105,15 +84,11 @@ infant
 budding
 1boy
 greta
-seven
 teen
 innocent
 teenager
 petite
-eight
 delicate
-8
-20
 adolescent
 swing
 baby
@@ -126,13 +101,41 @@ lolita
 2yo
 1yo
 tween
-nine
-10
 schoolgirl
 kindergarten
 kids
 3yo
-3
-1
-one
-three
+one years
+two years
+three years
+four years
+five years
+six years
+seven years
+eight years
+nine years
+ten years
+eleven years
+twelve years
+thirteen years
+fourteen years
+fifteen years
+sixteen years
+seventeen years
+1 years
+2 years
+3 years
+4 years
+5 years
+6 years
+7 years
+8 years
+9 years
+10 years
+11 years
+12 years
+13 years
+14 years
+15 years
+16 years
+17 years
