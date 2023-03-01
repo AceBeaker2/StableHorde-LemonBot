@@ -11,6 +11,7 @@ Created on Mon Feb 20 23:36:30 2023
 
 from itertools import product
 from word_forms.word_forms import get_word_forms
+from unidecode import unidecode
 
 def unleet(word):
     LEET_TO_STANDARD = {'4': 'a', '8': 'b', '3': 'e', '6': 'g', '1': 'i',
@@ -55,14 +56,15 @@ def check_intent(prompt, words):
     word_alts.append(unleetprompt)
     
     for naughty_word in words:
-        if naughty_word in prompt:
+        if unidecode(naughty_word.casefold()) in unidecode(prompt.casefold()):
             triggered = True
             triggers.append(naughty_word)
             
         for word in word_alts:
-            if naughty_word == word:
+            if unidecode(naughty_word.casefold()) == unidecode(word.casefold()):
                 triggered = True
                 triggers.append(naughty_word)
+                
     return (triggered, triggers)
 
 def check_cp(prompt):

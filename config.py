@@ -1,9 +1,3 @@
-token = 'BOT_TOKEN_HERE'
-# discord bot token
-
-sd_api_key = '0000000000'
-# horde api key, planning to add /link, and /unlink
-
 servermodels = True
 # If enabled, will fetch models from the server. If disabled, it will only
 # use models specified in the model_list
@@ -13,6 +7,12 @@ model_list = ['stable_diffusion', 'Midjourney Diffusion', 'Furry Epoch', 'Yiffy'
 # Use this if you want to limit usable models on the bot, but
 # note that only stable horde models will work. Find this list at
 # https://stablehorde.net/api/v2/status/models
+
+token = 'BOT_TOKEN_HERE'
+# discord bot token
+
+sd_api_key = '0000000000'
+# horde api key, planning to add /link, and /unlink
 
 default_images = 4
 # amount of images to generate on default, must be one of [1,2,4,6,8,9]
@@ -38,21 +38,7 @@ default_height = 768
 default_steps = 23
 # default steps for generations
 
-accept_dm = True
-# whether to accept requests in the DMs
-
-save_nsfw = True
-# if set to true, nsfw-filtered images will be saved in nsfwcache.
-
-# =======================
-# ADVANCED SETTINGS:
-# =======================
-
-url = 'https://stablehorde.net' # url to query
-endpoint = '/api/v2/generate/' # api async endpoint
-
-input_types = ('.png', '.jpg', '.jpeg', '.webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
-media_types = ('png', 'jpg', 'jpeg', 'webp',)
+input_types = ('png', 'jpg', 'jpeg', 'webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
 img_type = '.webp'
 format_type = 'WEBP'
 # image file extension. Note: only PIL-supported types are supported right now.
@@ -60,10 +46,22 @@ format_type = 'WEBP'
 use_embeds = True
 # whether to use embeds to response to the user
 # Idk why this is still here, pliss don't touch it
-# I stopped actually making responses without embeds    
+# I stopped actually making responses without embeds
 
+accept_dm = True
+# whether to accept requests in the DMs
+
+save_nsfw = True
+# if set to true, nsfw-filtered images will be saved in nsfwcache.
+
+# ADVANCED SETTINGS:
+    
+url = 'https://stablehorde.net' # url to query
+endpoint = '/api/v2/generate/' # api async endpoint
 wait_time = 2 # time between asynchronous API calls, lower = more status information, 
               # higher = less bandwidth usage. Keep under 15 preferably
+
+acceptable_controls = ['canny', 'hed', 'depth', 'normal', 'openpose', 'seg', 'scribble', 'fakescribbles', 'hough']
 
 timeout = 580
 # how long to wait before cancelling the request and sending images, keep below 600,
@@ -87,6 +85,8 @@ filter_strength = 0.3
 # Strength of nsfw filter. 0 will allow all messages, 1 will allow no messages
 
 thinking_emoji = '🤔'
+pleading_emoji = '🥺'
+eyes_emoji = '👀'
 # Unicode Emoji
 
 nsfw_neg_prompt = '(((deformed))), blurry, bad anatomy, disfigured, poorly drawn face, mutation, mutated, (extra_limb), (ugly), (poorly drawn hands), fused fingers, messy drawing, multiple breasts, (mutated hands and fingers:1.5), (long body :1.3), (mutation, poorly drawn :1.2), black-white, bad anatomy, liquid body, liquidtongue, disfigured, malformed, mutated, anatomical nonsense, text font ui, error, malformed hands, long neck, blurred, lowers, low res, bad anatomy, bad proportions, bad shadow, uncoordinated body, unnatural body, fused breasts, bad breasts, huge breasts, poorly drawn breasts, extra breasts, liquid breasts, heavy breasts, missingbreasts, huge haunch, huge thighs, huge calf, bad hands, fused hand, missing hand, disappearing arms, disappearing thigh, disappearing calf, disappearing legs, fusedears, bad ears, poorly drawn ears, extra ears, liquid ears, heavy ears, missing ears, fused animal ears, bad animal ears, poorly drawn animal ears, extra animal ears, liquidanimal ears, heavy animal ears, missing animal ears, text, ui, error, missing fingers, missing limb, fused fingers, one hand with more than 5 fingers, one hand with less than5 fingers, one hand with more than 5 digit, one hand with less than 5 digit, extra digit, fewer digits, fused digit, missing digit, bad digit, liquid digit, colorful tongue, blacktongue, cropped, watermark, username, blurry, JPEG artifacts, signature, 3D, 3D game, 3D game scene, 3D character, malformed feet, extra feet, bad feet, poorly drawnfeet, fused feet, missing feet, extra shoes, bad shoes, fused shoes, more than two shoes, poorly drawn shoes, bad gloves, poorly drawn gloves, fused gloves, bad hairs, poorly drawn hairs, fused hairs, badeyes, fused eyes poorly drawn eyes, extra eyes, malformed limbs, more than 2 nipples, missing nipples, different nipples, fused nipples, bad nipples, poorly drawnnipples, black nipples, colorful nipples, gross proportions. short arm, (((missing arms))), missing thighs, missing calf, missing legs, mutation, duplicate, morbid, mutilated, poorly drawn hands, more than 1 left hand, more than 1 right hand, deformed, (blurry), disfigured, missing legs, extra arms, extra thighs, more than 2 thighs, extra calf,fused calf, extra legs, bad knee, extra knee, more than 2 legs, bad tails, bad mouth, fused mouth, poorly drawn mouth, bad tongue, tongue within mouth, too longtongue, black tongue, big mouth, cracked mouth, bad mouth, dirty face, dirty teeth, dirty pantie, fused pantie, poorly drawn pantie, fused cloth, poorly drawn cloth, badpantie, yellow teeth, thick lips, bad camel toe, colorful camel toe, bad asshole, poorly drawn asshole, fused asshole, missing asshole, bad anus, bad pussy, bad crotch, badcrotch seam, fused anus, fused pussy, fused anus, fused crotch, poorly drawn crotch, fused seam, poorly drawn anus, poorly drawn pussy, poorly drawn crotch, poorlydrawn crotch seam, bad thigh gap, missing thigh gap, fused thigh gap, liquid thigh gap, poorly drawn thigh gap, poorly drawn anus, bad collarbone, fused collarbone, missing collarbone, liquid collarbone, strong girl, obesity, worst quality, low quality, normal quality, liquid tentacles, bad tentacles, poorly drawn tentacles, split tentacles, fused tentacles, missing clit, bad clit, fused clit, colorful clit, black clit, liquid clit, QR code, bar code, censored, pubic hair, mosaic, futa, testis'
@@ -145,6 +145,11 @@ if servermodels:
 else:
     print('\n Using User-defined list: ' + str(model_list) + '\n')
 
-if len(model_list) > 25:
-    print('Error: List is greater than max allowed by discord. Using top 25 models')
-    model_list = model_list[:25]
+import disnake
+
+async def autocomp_models(inter: disnake.ApplicationCommandInteraction, user_input: str):
+    return [model for model in model_list if user_input.casefold() in model.casefold()]
+    
+if not os.path.isfile('persistence.txt'):
+    with open('persistence.txt', mode='a'): pass
+    

@@ -2,7 +2,7 @@ import disnake
 from typing import Optional
 from disnake.ext import commands
 import config as settings
-#import nest_asyncio
+import nest_asyncio
 # above line is weird spyder workaround. DW about it.
 import asyncio
 import aiohttp
@@ -13,9 +13,12 @@ from nsfw_detector import predict
 import base64
 import io
 import ast
+import aiofiles
 
 import os
 import json
+
+import views
 
 try:
     import intents
@@ -26,16 +29,382 @@ model = predict.load_model('./checker.h5')
 # gets model
 
 logging.basicConfig(level=logging.INFO)
-#nest_asyncio.apply()
+nest_asyncio.apply()
 # weird spyder thing I don't get it
 
-bot = commands.Bot(
-    command_prefix=disnake.ext.commands.when_mentioned,
-    )
+class UpscaleView(disnake.ui.View):
+    def __init__(self, codeid, number):
+        super().__init__(timeout=None)
+        with open('textcache/' + codeid + '.txt', 'r') as f:
+            text = f.read()
+            
+        self.codeid = codeid
+        self.vars = ast.literal_eval(text)
+        self.number = number
+        filepath = asyncio.run(upscale_code(codeid, number))
+        self.filepath = filepath
+        self.color = asyncio.run(average_color(self.filepath))
+        
+        self.moreinfo.custom_id = f'{codeid}@{number}@m'
+        
+        self.facial.custom_id = f'{codeid}@{number}@f'
+        
+        self.variate.custom_id = f'{codeid}@{number}@v'
+        
+        self.outpaint.custom_id = f'{codeid}@{number}@o'
+    
+    @disnake.ui.button(custom_id='info', label='More Info!', style=disnake.ButtonStyle.blurple, emoji=settings.thinking_emoji , row=1)
+    async def moreinfo(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        embed=disnake.Embed(title='Status Sheet', color=self.color)
+        
+        embed.add_field(name='Seed:', value=self.vars[str(self.number-1)]['seed'], inline=False)
+        embed.add_field(name='Seed:', value=self.vars['0']['seed'], inline=False)
+        embed.add_field(name='Sampler:', value=self.vars['sampler'], inline=False)
+        embed.add_field(name='Prompt:', value=self.vars['prompt'][:1024], inline=False)
+        embed.add_field(name='Negative Prompt:', value=self.vars['neg_prompt'][:1024], inline=False)
+        embed.add_field(name='Model:', value=self.vars['model'], inline=False)
+        embed.add_field(name='Content Filter', value=str(self.vars['filter']), inline=False)
+        embed.add_field(name='CFG Scale:', value=self.vars['cfg_scale'], inline=False)
+        embed.add_field(name='Steps:', value=str(self.vars['steps']), inline=False)
+        embed.add_field(name='Dimensions:', value=str(self.vars['width']) + 'x' + str(self.vars['height']), inline=False)
+        embed.add_field(name='Upscaler:', value=str(self.vars['upscalers']), inline=False)
+        embed.add_field(name='Author:', value='<@'+str(self.vars['author'])+'>', inline=False)
+            
+        embed.set_image(file=disnake.File(self.filepath))
+        await inter.send(embed=embed)
 
-@bot.event
-async def on_ready():
-    print('The bot is ready!')
+    @disnake.ui.button(custom_id='esrgan', label='x4 Upscale', style=disnake.ButtonStyle.blurple, emoji=settings.eyes_emoji, row=1)
+    async def esrgan(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        await inter.send('Your Upscale is on the way!', ephemeral=True) 
+        dm = False
+        try:
+            nsfw = not inter.channel.nsfw or settings.nsfw_filter
+        except AttributeError:
+            dm = True
+            nsfw = True
+                   
+        image_info = await pil2base64(Image.open(self.filepath))
+        source_image, width, height = image_info
+        author = inter.user
+
+        inter_response = await inter.original_response()         
+            
+        vvars = {
+                 'prompt': '(intricate:1.4) paint, intricate, trending on artstation with intricate oil painted details',
+                 'neg_prompt': self.vars['neg_prompt'],
+                 'width': width,
+                 'height': height,
+                 'upscalers': 'RealESRGAN_x4plus',
+                 'model': 'stable_diffusion',
+                 'cfg_scale': self.vars['cfg_scale'],
+                 'userid': author.mention,
+                 'channelid': inter.channel_id,
+                 'sampler': self.vars['sampler'],
+                 'karras': True,
+                 'steps': 70,
+                 'source_image': source_image,
+                 'source_processing': 'img2img',
+                 'source_mask': None,
+                 'filter':nsfw,
+                 'dm': dm,
+                 'author': author,
+                 'denoising_strength': 0.2,
+                 'seed': -1,
+                 'inter_response': inter_response,
+                 'amount' : 1,
+                 'tiling' : False,
+                 'hires_fix' : False,
+                 'english' : True,
+                }
+        await query_api(settings.url + settings.endpoint, vvars, inter)
+    
+        
+    @disnake.ui.button(custom_id='facial', label='Facial Redo', style=disnake.ButtonStyle.blurple, emoji=settings.pleading_emoji, row=1)
+    async def facial(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        await inter.send('Your Facial Redo is on the way!', ephemeral=True) 
+        dm = False
+        try:
+            nsfw = not inter.channel.nsfw or settings.nsfw_filter
+        except AttributeError:
+            dm = True
+            nsfw = True
+                   
+        image_info = await pil2base64(Image.open(self.filepath))
+        source_image, width, height = image_info
+        author = inter.user
+
+        inter_response = await inter.original_response()         
+            
+        vvars = {
+                 'prompt': self.vars['prompt'],
+                 'neg_prompt': self.vars['neg_prompt'],
+                 'width': self.vars['width'],
+                 'height': self.vars['height'],
+                 'upscalers': 'CodeFormers',
+                 'model': self.vars['model'],
+                 'cfg_scale': self.vars['cfg_scale'],
+                 'userid': author.mention,
+                 'channelid': inter.channel_id,
+                 'sampler': self.vars['sampler'],
+                 'karras': True,
+                 'steps': 10,
+                 'source_image': source_image,
+                 'source_processing': 'img2img',
+                 'source_mask': None,
+                 'filter':nsfw,
+                 'dm': dm,
+                 'author': author,
+                 'denoising_strength': 0.0,
+                 'seed': -1,
+                 'inter_response': inter_response,
+                 'amount' : 1,
+                 'tiling' : False,
+                 'hires_fix' : False,
+                 'english' : False,
+                }
+        await query_api(settings.url + settings.endpoint, vvars, inter)
+    
+
+    @disnake.ui.button(custom_id='variate', label='Make Variations', style=disnake.ButtonStyle.green)
+    async def variate(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        await inter.send('Your Variation is on the way!', ephemeral=True) 
+        dm = False
+        try:
+            nsfw = not inter.channel.nsfw or settings.nsfw_filter
+        except AttributeError:
+            dm = True
+            nsfw = True
+                   
+        image_info = await pil2base64(Image.open(self.filepath))
+        source_image, width, height = image_info
+        
+        author = inter.user
+
+        inter_response = await inter.original_response()         
+        
+        vvars = {
+                 'prompt': self.vars['prompt'],
+                 'neg_prompt': self.vars['neg_prompt'],
+                 'width': self.vars['width'],
+                 'height': self.vars['height'],
+                 'upscalers': 'GFPGAN',
+                 'model': self.vars['model'],
+                 'cfg_scale': self.vars['cfg_scale'],
+                 'userid': author.mention,
+                 'channelid': inter.channel_id,
+                 'sampler': self.vars['sampler'],
+                 'karras': True,
+                 'steps': 10,
+                 'source_image': source_image,
+                 'source_processing': 'img2img',
+                 'source_mask': None,
+                 'filter':nsfw,
+                 'dm': dm,
+                 'author': author,
+                 'denoising_strength': 0.8,
+                 'seed': -1,
+                 'inter_response': inter_response,
+                 'amount': settings.default_images,
+                 'tiling' : False,
+                 'hires_fix' : True,
+                 'english' : False,
+                 }
+        await query_api(settings.url + settings.endpoint, vvars, inter)
+
+    @disnake.ui.button(custom_id='outpaint', label='Outpaint', style=disnake.ButtonStyle.green)
+    async def outpaint(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
+        author = inter.user
+        dm = False
+        try:
+            nsfw = not inter.channel.nsfw or settings.nsfw_filter
+        except AttributeError:
+            dm = True
+            nsfw = True
+              
+        try:
+            image_info = await pil2mask(Image.open(self.filepath))
+            source_image, mask_string, width, height = image_info  
+        except:
+            await inter.response.send_message('Error, URL invalid. Please try another image', ephemeral=True)  
+            return
+        
+        await inter.response.send_modal(
+        title='Outpaint image',
+        custom_id='outpaint_modal',
+        components=[
+                disnake.ui.TextInput(
+                label='Prompt',
+                placeholder='The prompt for outpainting',
+                custom_id='prompt',
+                style=disnake.TextInputStyle.paragraph,
+                max_length=1024,
+                ),
+                disnake.ui.TextInput(
+                label='Negative Prompt',
+                placeholder='The negative prompt for outpainting',
+                custom_id='neg_prompt',
+                required=False,
+                value='2D, grid, text',
+                style=disnake.TextInputStyle.paragraph,
+                max_length=1024,
+                ),
+            ],
+        )
+        try:
+            modal_inter: disnake.ModalInteraction = await bot.wait_for(
+                'modal_submit',
+                check=lambda i: i.custom_id == 'outpaint_modal' and i.author.id == inter.author.id,
+                timeout=600,
+                )
+        except asyncio.TimeoutError:
+            # The user didn't submit the modal in the specified period of time.
+            # This is done since Discord doesn't dispatch any event for when a modal is closed/dismissed.
+            return
+        await modal_inter.response.send_message('Outpaint request is on its way!')
+        
+        inter_response = await modal_inter.original_response() 
+        
+        ovars = {
+            'prompt': modal_inter.text_values['prompt'],
+            'neg_prompt': modal_inter.text_values['neg_prompt'],
+            'width': width,
+            'height': height,
+            'upscalers': 'GFPGAN',
+            'model': 'stable_diffusion_inpainting',
+            'cfg_scale': self.vars['cfg_scale'],
+            'userid': author.mention,
+            'channelid': inter.channel_id,
+            'sampler': 'k_euler_a',
+            'karras': True,
+            'steps': 10,
+            'source_image': source_image,
+            'source_processing': 'inpainting',
+            'source_mask': mask_string,
+            'filter':nsfw,
+            'dm': dm,
+            'author': inter.author,
+            'denoising_strength': 0.75,
+            'seed': -1,
+            'inter_response': inter_response,
+            'amount': settings.default_images,
+            'tiling' : False,
+            'hires_fix' : True,
+            'english' : False,
+            }
+        await query_api(settings.url + settings.endpoint, ovars, inter)
+    
+class GenView(disnake.ui.View):
+    def make_view(self, amount, codeid):
+    
+        u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0)
+        u2 = disnake.ui.Button(custom_id='u2', label='U2', style=disnake.ButtonStyle.blurple, row=0)
+        u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=0)
+        u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=0)
+        u5 = disnake.ui.Button(custom_id='u5', label='U5', style=disnake.ButtonStyle.blurple, row=1)
+        u6 = disnake.ui.Button(custom_id='u6', label='U6', style=disnake.ButtonStyle.blurple, row=1)
+        u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=1)
+        u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=1)
+        u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=1)
+    
+        if amount == 1:
+            u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0, disabled=True)
+        elif amount == 4:
+            u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=1)
+            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+        elif amount == 6:
+            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+        elif amount == 9:
+            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+            u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=2)
+            u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=2)
+            u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=2)
+        
+        async def u1callback(interaction):
+            await upscale(interaction, number=1, code=codeid)
+        async def u2callback(interaction):
+            await upscale(interaction, number=2, code=codeid)
+        async def u3callback(interaction):
+            await upscale(interaction, number=3, code=codeid) 
+        async def u4callback(interaction):
+            await upscale(interaction, number=4, code=codeid)
+        async def u5callback(interaction):
+            await upscale(interaction, number=5, code=codeid)
+        async def u6callback(interaction):
+            await upscale(interaction, number=6, code=codeid)
+        async def u7callback(interaction):
+            await upscale(interaction, number=7, code=codeid)
+        async def u8callback(interaction):
+            await upscale(interaction, number=8, code=codeid)  
+        async def u9callback(interaction):
+            await upscale(interaction, number=9, code=codeid)
+    
+    
+        u1.callback = u1callback
+        u2.callback = u2callback
+        u3.callback = u3callback
+        u4.callback = u4callback
+        u5.callback = u5callback
+        u6.callback = u6callback
+        u7.callback = u7callback
+        u8.callback = u8callback
+        u9.callback = u9callback
+    
+        view = disnake.ui.View(timeout=None)
+    
+        if amount >= 1:
+            view.add_item(u1) 
+        if amount >= 2:
+            view.add_item(u2)    
+        if amount >= 4:
+            view.add_item(u3)
+            view.add_item(u4)   
+        if amount >= 6:
+            view.add_item(u5)
+            view.add_item(u6)  
+        if amount >= 8:
+            view.add_item(u7)
+            view.add_item(u8)
+        if amount >= 9:
+            view.add_item(u9)
+            
+        return view
+   
+    
+class PersistentViewBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix=commands.when_mentioned)
+        self.persistent_views_added = False
+
+    async def on_ready(self):
+        # `on_ready` can be fired multiple times during a bot's lifetime,
+        # we only want to register the persistent view once.
+        if not self.persistent_views_added:
+            # Register the persistent view for listening here.
+            # Note that this does not send the view to any message.
+            # In order to do this you need to first send a message with the View, which is shown below.
+            # If you have the message_id you can also pass it as a keyword argument, but for this example
+            # we don't have one.
+            async with aiofiles.open('persistence.txt', mode='r') as file:
+                lines = await file.readlines()
+                
+            for line in lines:
+                if '@' in line:
+                    elements = line.split('@')
+                    self.add_view(UpscaleView(elements[0], int(elements[1])))
+                elif '_' in line:
+                    elements = line.split('_')
+                    view = GenView()
+                    self.add_view(view.make_view(int(elements[1]),elements[0]))
+                    
+            self.persistent_views_added = True
+
+        print(f"Logged in as {self.user} (ID: {self.user.id})\n------")
+
+bot = PersistentViewBot()
+
+#@bot.slash_command(description='persistent views')
+#async def persistency(inter):
+#    await inter.response.send_message('', view=views.PersistentView())
 
 @bot.slash_command(description='Help menu!!!')
 async def config(inter):
@@ -49,7 +418,7 @@ async def caption(
     inter: disnake.ApplicationCommandInteraction,
     image: disnake.Attachment = commands.Param(description='Image to caption'),
     ):
-    if not str(image.content_type) == image.content_type or not image.content_type.endswith(settings.media_types):
+    if not str(image.content_type) == image.content_type or not image.content_type.endswith(settings.input_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -133,230 +502,20 @@ async def upscale(
         embed=disnake.Embed(title='Generation Done!', color=color)
         embed.add_field(name='Seed:', value=str(vars['0']['seed']), inline=False)
     embed.set_image(file=disnake.File(filepath))
-
-    view = disnake.ui.View(timeout=None)
-
-    moreinfo = disnake.ui.Button(custom_id='info', label='More Info', style=disnake.ButtonStyle.blurple, emoji='🤔', row=1)
-    variate = disnake.ui.Button(custom_id='variate', label='Make Variations', style=disnake.ButtonStyle.green)
-    outpaint = disnake.ui.Button(custom_id='outpaint', label='Outpaint', style=disnake.ButtonStyle.green)
-    facial = disnake.ui.Button(custom_id='facial', label='Facial Redo', style=disnake.ButtonStyle.blurple, emoji='🥺', row=1)
     
-    #except:
-    #    embed = disnake.Embed('Upscale Failed!', color=0xff0000)
-    #    
-    #    view = disnake.ui.View()
+    message = await inter.followup.send('Image for ' + inter.author.mention + '!',embed=embed)
     
-    async def infocallback(interaction):
-        embed=disnake.Embed(title='Status Sheet', color=color)
-        
-        if not number == 200:
-            embed.add_field(name='Seed:', value=vars[str(number-1)]['seed'], inline=False)
-        else:
-            embed.add_field(name='Seed:', value=vars['0']['seed'], inline=False)
-        embed.add_field(name='Sampler:', value=vars['sampler'], inline=False)
-        embed.add_field(name='Prompt:', value=vars['prompt'][:1024], inline=False)
-        embed.add_field(name='Negative Prompt:', value=vars['neg_prompt'][:1024], inline=False)
-        embed.add_field(name='Model:', value=vars['model'], inline=False)
-        embed.add_field(name='Content Filter', value=str(vars['filter']), inline=False)
-        embed.add_field(name='CFG Scale:', value=vars['cfg_scale'], inline=False)
-        embed.add_field(name='Steps:', value=str(vars['steps']), inline=False)
-        embed.add_field(name='Dimensions:', value=str(vars['width']) + 'x' + str(vars['height']), inline=False)
-        embed.add_field(name='Upscaler:', value=str(vars['upscalers']), inline=False)
-        embed.add_field(name='Author:', value='<@'+str(vars['author'])+'>', inline=False)
-        
-        embed.set_image(file=disnake.File(filepath))
-        await interaction.send(embed=embed)
-    async def facialcallback(interaction):
-        await interaction.send('Your Facial Redo is on the way!', ephemeral=True) 
-        dm = False
-        try:
-             nsfw = not interaction.channel.nsfw or settings.nsfw_filter
-        except AttributeError:
-             dm = True
-             nsfw = True
-               
-        image_info = await url2base64(imageurl)
-        source_image, width, height = image_info
-
-        author = interaction.user
-
-        inter_response = await inter.original_response()         
-        
-        vvars = {
-             'prompt': vars['prompt'],
-             'neg_prompt': vars['neg_prompt'],
-             'width': vars['width'],
-             'height': vars['height'],
-             'upscalers': 'CodeFormers',
-             'model': vars['model'],
-             'cfg_scale': vars['cfg_scale'],
-             'imageurl': imageurl,
-             'userid': author.mention,
-             'channelid': inter.channel_id,
-             'sampler': vars['sampler'],
-             'karras': True,
-             'steps': 10,
-             'source_image': source_image,
-             'source_processing': 'img2img',
-             'source_mask': None,
-             'filter':nsfw,
-             'dm': dm,
-             'author': author,
-             'denoising_strength': 0.0,
-             'seed': -1,
-             'inter_response': inter_response,
-             'amount' : 1,
-             'tiling' : False,
-             'hires_fix' : False,
-             }
-        await query_api(settings.url + settings.endpoint, vvars, interaction)
-    async def variatecallback(interaction):
-        await interaction.send('Your Variation is on the way!', ephemeral=True) 
-        dm = False
-        try:
-             nsfw = not interaction.channel.nsfw or settings.nsfw_filter
-        except AttributeError:
-             dm = True
-             nsfw = True
-               
-        image_info = await url2base64(imageurl)
-        source_image, width, height = image_info
-
-        author = interaction.user
-
-        inter_response = await inter.original_response()         
-        
-        vvars = {
-             'prompt': vars['prompt'],
-             'neg_prompt': vars['neg_prompt'],
-             'width': vars['width'],
-             'height': vars['height'],
-             'upscalers': 'GFPGAN',
-             'model': vars['model'],
-             'cfg_scale': vars['cfg_scale'],
-             'imageurl': imageurl,
-             'userid': author.mention,
-             'channelid': inter.channel_id,
-             'sampler': vars['sampler'],
-             'karras': True,
-             'steps': 10,
-             'source_image': source_image,
-             'source_processing': 'img2img',
-             'source_mask': None,
-             'filter':nsfw,
-             'dm': dm,
-             'author': author,
-             'denoising_strength': 0.8,
-             'seed': -1,
-             'inter_response': inter_response,
-             'amount': settings.default_images,
-             'tiling' : False,
-             'hires_fix' : True
-             }
-        await query_api(settings.url + settings.endpoint, vvars, interaction)
-    
-    async def outpaintcallback(interaction):
-        author = interaction.user
-        dm = False
-        try:
-            nsfw = not interaction.channel.nsfw or settings.nsfw_filter
-        except AttributeError:
-            dm = True
-            nsfw = True
-              
-        try:
-            image_info = await url2mask(imageurl)
-            source_image, mask_string, width, height = image_info  
-        except:
-            await inter.response.send_message('Error, URL invalid. Please try another image', ephemeral=True)  
-            return
-        
-        await interaction.response.send_modal(
-        title='Outpaint image',
-        custom_id='outpaint_modal',
-        components=[
-                disnake.ui.TextInput(
-                label='Prompt',
-                placeholder='The prompt for outpainting',
-                custom_id='prompt',
-                style=disnake.TextInputStyle.paragraph,
-                max_length=1024,
-                ),
-                disnake.ui.TextInput(
-                label='Negative Prompt',
-                placeholder='The negative prompt for outpainting',
-                custom_id='neg_prompt',
-                required=False,
-                value='2D, grid, text',
-                style=disnake.TextInputStyle.paragraph,
-                max_length=1024,
-                ),
-            ],
-        )
-        try:
-            modal_inter: disnake.ModalInteraction = await bot.wait_for(
-                'modal_submit',
-                check=lambda i: i.custom_id == 'outpaint_modal' and i.author.id == interaction.author.id,
-                timeout=600,
-                )
-        except asyncio.TimeoutError:
-            # The user didn't submit the modal in the specified period of time.
-            # This is done since Discord doesn't dispatch any event for when a modal is closed/dismissed.
-            return
-        await modal_inter.response.send_message('Outpaint request is on its way!')
-        
-        inter_response = await modal_inter.original_response() 
-        
-        ovars = {
-            'prompt': modal_inter.text_values['prompt'],
-            'neg_prompt': modal_inter.text_values['neg_prompt'],
-            'width': width,
-            'height': height,
-            'upscalers': 'GFPGAN',
-            'model': 'stable_diffusion_inpainting',
-            'cfg_scale': vars['cfg_scale'],
-            'imageurl': imageurl,
-            'userid': author.mention,
-            'channelid': inter.channel_id,
-            'sampler': 'k_euler_a',
-            'karras': True,
-            'steps': 10,
-            'source_image': source_image,
-            'source_processing': 'inpainting',
-            'source_mask': mask_string,
-            'filter':nsfw,
-            'dm': dm,
-            'author': inter.author,
-            'denoising_strength': 0.75,
-            'seed': -1,
-            'inter_response': inter_response,
-            'amount': settings.default_images,
-            'tiling' : False,
-            'hires_fix' : True
-            }
-        await query_api(settings.url + settings.endpoint, ovars, interaction)
-    
-    outpaint.callback = outpaintcallback
-    moreinfo.callback = infocallback
-    variate.callback = variatecallback
-    facial.callback = facialcallback
-    
-    if number == 200:
-        view.add_item(disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, disabled=True))
-    
-    view.add_item(variate)
-    view.add_item(facial)
-    view.add_item(outpaint)
-    view.add_item(moreinfo)
-    # number == 200
-    if 1:
-        message = await inter.followup.send('Job done for user ' + inter.author.mention + '!',embed=embed, view=view)
-        imageurl = message.embeds[0].image.url
-    else:
-        message = await inter.original_message()
-        imageurl = message.embeds[0].image.url
-        await inter.edit_original_message(embed=embed, view=view) 
     imageurl = message.embeds[0].image.url
+    
+    view = UpscaleView(code, number)
+    
+    await views.add_data(code + '@' + str(number))
+        
+    embed.set_image(url=imageurl)
+    
+    await message.delete()
+    
+    message = await inter.followup.send('Image done: ' + inter.author.mention + '!',embed=embed, view=view)
     
 @bot.slash_command(description='Generates images using Stable Horde!')
 async def generate(
@@ -364,7 +523,7 @@ async def generate(
     prompt: str = commands.Param(description='What the AI-generated image should be of.'),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=settings.processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
-    model: str = commands.Param(default=settings.default_model,choices=settings.model_list, description='Which model to generate the image with. Default: ' + str(settings.default_model)),
+    model: str = commands.Param(default=settings.default_model,autocomplete=settings.autocomp_models, description='Which model to generate the image with. Default: ' + str(settings.default_model)),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     #imageurl: str = commands.Param(name = 'init_image', default = None, description='Initial image for img2img.'),
     width: int = commands.Param(default = settings.default_width, le=1024, ge=64, description='Width of the final image. Default: ' + str(settings.default_width)),
@@ -375,7 +534,12 @@ async def generate(
     amount: int = commands.Param(default=settings.default_images, choices = [1,2,4,6,8,9], description='Amount of images to generate. Default: ' + str(settings.default_images)),
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
+    english: bool = commands.Param(default = True, description='Set to false if prompt language is not English'),
 ): 
+    if not model in settings.model_list:
+        await inter.response.send_message('Invalid Model: ```'+model+'```', ephemeral=True)
+        return
+    
     karras = True
     dm = False
     imageurl = None
@@ -437,11 +601,11 @@ async def generate(
         'amount': amount,
         'tiling' : tiling,
         'hires_fix' : hires_fix,
+        'english' : english,
         }
     global url
     global endpoint
     await query_api(settings.url + settings.endpoint, vars, inter)
-
 
 @bot.slash_command(description='Generates images using Stable Horde img2img!')
 async def riff(
@@ -450,7 +614,7 @@ async def riff(
     prompt: str = commands.Param(description='Command for the AI, e.g. \'Make her hair green\''),
     neg_prompt: str = commands.Param(default = '2D, grid, text', description='What the AI image model should avoid. Default: \'2D, grid, text\''),
     upscalers: str = commands.Param(choices=settings.processor_list, default='GFPGAN', description='Which Post-Processing to use for the images. Default: GFPGAN'),
-    model: str = commands.Param(default=settings.default_riff,choices=settings.model_list, description='Which model to generate the image with. Default: ' + str(settings.default_riff)),
+    model: str = commands.Param(default=settings.default_riff,autocomplete=settings.autocomp_models, description='Which model to generate the image with. Default: ' + str(settings.default_riff)),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     denoising_strength: int = commands.Param(name = 'image_guidance',le=100, ge=0, description = 'How much the image should match the provided, 100 = clone, 0 = no effect'),
     sampler: str = commands.Param(default = settings.default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + settings.default_sampler, choices=settings.sampler_list),
@@ -459,8 +623,14 @@ async def riff(
     amount: int = commands.Param(default=settings.default_images, choices = [1,2,4,6,8,9], description='Amount of images to generate. Default: ' + str(settings.default_images)),
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
+    english: bool = commands.Param(default = True, description='Set to false if prompt language is not English'),
+    control_type: str = commands.param(default = None, choices=settings.acceptable_controls, description='ControlNet Parameter type'),
 ):
-    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.media_types):
+    if not model in settings.model_list and not model == 'pix2pix':
+        await inter.response.send_message('Invalid Model: ```'+model+'```', ephemeral=True)
+        return
+        
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -530,6 +700,8 @@ async def riff(
         'amount': amount,
         'tiling' : tiling,
         'hires_fix' : hires_fix,
+        'english' : english,
+        'control_type' : control_type,
         }
     global url
     global endpoint
@@ -549,10 +721,11 @@ async def outpaint(
     amount: int = commands.Param(default=settings.default_images, choices = [1,2,4,6,8,9], description='Amount of images to generate. Default: ' + str(settings.default_images)),
     tiling: bool = commands.Param(default = False, description='Whether to have the image be repeating and tileable. Default: False'),
     hires_fix: bool = commands.Param(default = True, description='Improves Image Quality at high resolutions. Default: True'),
+    english: bool = commands.Param(default = True, description='Set to false if prompt language is not English'),
 ):
     model = 'stable_diffusion_inpainting'
     
-    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.media_types):
+    if not str(init_image.content_type) == init_image.content_type or not init_image.content_type.endswith(settings.input_types):
         await inter.response.send_message('Attachment is not valid image of types: WebP, PNG, JPG, JPEG', ephemeral=True)
         return
     
@@ -622,6 +795,7 @@ async def outpaint(
         'amount': amount,
         'tiling' : tiling,
         'hires_fix' : hires_fix,
+        'english' : english
         }
     global url
     global endpoint
@@ -719,6 +893,31 @@ async def url2base64(url):
             image_string = base64.b64encode(bytesio.read()).decode()
             return [image_string, rounded_width, rounded_height]
 
+async def pil2base64(image):
+    width, height = image.size
+            
+    rounded_width = 0
+    rounded_height = 0
+
+    if width <= height:
+        rounded_width = settings.default_width
+        rounded_height = (height/width*settings.default_width)
+    else:
+        rounded_height = settings.default_height
+        rounded_width = (width/height*settings.default_width)
+        
+    rounded_width = round(rounded_width / 64) * 64
+    rounded_height = round(rounded_height / 64) * 64
+    rounded_width = min(max(rounded_width, 64), 1024)
+    rounded_height = min(max(rounded_height, 64), 1024)
+    image_resized = image.resize((rounded_width, rounded_height))
+    bytesio = io.BytesIO()
+    image_resized.save(bytesio, format = settings.format_type)
+    
+    bytesio.seek(0)
+    image_string = base64.b64encode(bytesio.read()).decode()
+    return [image_string, width, height]
+
 async def attach2base64(image):
     image_data = await image.read()
     image = Image.open(io.BytesIO(image_data))
@@ -791,6 +990,47 @@ async def url2mask(url):
             mask_string = base64.b64encode(bytesio.read()).decode()
             
             return [image_string, mask_string, rounded_width, rounded_height]
+
+async def pil2mask(image):
+    width, height = image.size
+            
+    rounded_width = 0
+    rounded_height = 0
+
+    if width <= height:
+        rounded_width = 512
+        rounded_height = (height/width*512)
+    else:
+        rounded_height = 512
+        rounded_width = (width/height*512)
+            
+    rounded_width = round(width / 64) * 64
+    rounded_height = round(height / 64) * 64
+    rounded_width = min(max(rounded_width, 64), 1024)
+    rounded_height = min(max(rounded_height, 64), 1024)
+            
+    image_resized = image.resize((rounded_width//3+2, rounded_height//3+2))
+            
+    canvas = Image.new('RGB', (rounded_width, rounded_height), color='white')
+            
+    xy = (rounded_width//3)
+            
+    canvas.paste(image_resized, (xy-1, xy-1))
+            
+    bytesio = io.BytesIO()
+    canvas.save(bytesio, format = settings.format_type)
+    bytesio.seek(0)
+    image_string = base64.b64encode(bytesio.read()).decode()
+            
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle((xy, xy, xy*2, xy*2), fill='black')
+            
+    bytesio = io.BytesIO()
+    canvas.save(bytesio, format = settings.format_type)
+    bytesio.seek(0)
+    mask_string = base64.b64encode(bytesio.read()).decode()
+            
+    return [image_string, mask_string, rounded_width, rounded_height]
 
 async def average_color(path):
     try:
@@ -965,9 +1205,17 @@ async def query_api(url, vars, interaction):
         'n': amount,
         'denoising_strength': vars['denoising_strength'],
         }
+    
+    if 'control_type' in vars:
+        if not vars['control_type'] == None:
+            params.update({'control_type': vars['control_type']})
 
     if not vars['seed'] == -1:
         params.update({'seed': str(vars['seed'])})
+
+    if not vars['english']:
+        vars['prompt'] = await views.trans_query(vars['prompt'])
+        vars['neg_prompt'] = await views.trans_query(vars['neg_prompt'])
 
     json_data = {
         'prompt': vars['prompt'] + '###' + vars['neg_prompt'],
@@ -993,6 +1241,7 @@ async def query_api(url, vars, interaction):
     
     vars.pop('source_image')
     vars.pop('source_mask')    
+    
     
     # Initialize a variable to track whether the desired status has been received, failed, and a list to capture results
     done = False
@@ -1064,7 +1313,7 @@ async def query_api(url, vars, interaction):
             await asyncio.sleep(settings.wait_time)
             print(failed)
             print(done)
-            
+        await views.add_data(codeid + '_' + str(vars['amount']))
         async with session.get(url + 'status/' + codeid) as response:
             rawtext = await response.text()
             rstatus = response.status
@@ -1127,76 +1376,8 @@ async def query_api(url, vars, interaction):
                 
                 if settings.use_embeds:
                     
-                    u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0)
-                    u2 = disnake.ui.Button(custom_id='u2', label='U2', style=disnake.ButtonStyle.blurple, row=0)
-                    u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=0)
-                    u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=0)
-                    u5 = disnake.ui.Button(custom_id='u5', label='U5', style=disnake.ButtonStyle.blurple, row=1)
-                    u6 = disnake.ui.Button(custom_id='u6', label='U6', style=disnake.ButtonStyle.blurple, row=1)
-                    u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=1)
-                    u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=1)
-                    u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=1)
-                    
-                    if amount == 1:
-                        u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0, disabled=True)
-                    elif amount == 4:
-                        u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=1)
-                        u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
-                    elif amount == 6:
-                        u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
-                    elif amount == 9:
-                        u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
-                        u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=2)
-                        u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=2)
-                        u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=2)
-                        
-                    async def u1callback(interaction):
-                        await upscale(interaction, number=1, code=codeid)
-                    async def u2callback(interaction):
-                        await upscale(interaction, number=2, code=codeid)
-                    async def u3callback(interaction):
-                        await upscale(interaction, number=3, code=codeid) 
-                    async def u4callback(interaction):
-                        await upscale(interaction, number=4, code=codeid)
-                    async def u5callback(interaction):
-                        await upscale(interaction, number=5, code=codeid)
-                    async def u6callback(interaction):
-                        await upscale(interaction, number=6, code=codeid)
-                    async def u7callback(interaction):
-                        await upscale(interaction, number=7, code=codeid)
-                    async def u8callback(interaction):
-                        await upscale(interaction, number=8, code=codeid)  
-                    async def u9callback(interaction):
-                        await upscale(interaction, number=9, code=codeid)
-                    
-                    
-                    u1.callback = u1callback
-                    u2.callback = u2callback
-                    u3.callback = u3callback
-                    u4.callback = u4callback
-                    u5.callback = u5callback
-                    u6.callback = u6callback
-                    u7.callback = u7callback
-                    u8.callback = u8callback
-                    u9.callback = u9callback
-                    
-                    view = disnake.ui.View(timeout=None)
-                    
-                    if amount >= 1:
-                        view.add_item(u1) 
-                    if amount >= 2:
-                        view.add_item(u2)    
-                    if amount >= 4:
-                        view.add_item(u3)
-                        view.add_item(u4)   
-                    if amount >= 6:
-                        view.add_item(u5)
-                        view.add_item(u6)  
-                    if amount >= 8:
-                        view.add_item(u7)
-                        view.add_item(u8)
-                    if amount >= 9:
-                        view.add_item(u9)
+                    view = GenView()
+                    view = view.make_view(vars['amount'], codeid)
                         
                     filepath = 'imagecache/' + codeid + settings.img_type
                     
@@ -1207,15 +1388,22 @@ async def query_api(url, vars, interaction):
                     embed.add_field(name='Images timed out:', value=str(errors), inline=True)
                     embed.add_field(name='Filtered images:', value=str(filtered_images), inline=True)
                     embed.add_field(name='Code(for debugging):', value='||' + codeid + '||', inline=True)
-                    embed.set_image(file=disnake.File(filepath))
                     await message.delete()
                     if amount == 1:
                         await upscale(interaction, codeid, 200)
                         return
                     try:
-                        await vars['inter_response'].reply('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        message = await vars['inter_response'].reply('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        embed.set_image(file=disnake.File(filepath))
+                        await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
                     except:
-                        await msg_channel.send_message('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        message = await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        embed.set_image(file=disnake.File(filepath))
+                        await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        #try:
+                        #    await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        #except:
+                        #    await msg_channel.send_message('Job done for user ' + vars['userid'], embed=embed, view=view)
                 else:
                     await message.edit(file=disnake.File('imagecache/' + codeid + settings.img_type))
 

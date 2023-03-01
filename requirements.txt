@@ -6,3 +6,7 @@ nsfw-detector
 urllib3
 requests
 word-forms
+Unidecode
+aiofiles
+nest-asyncio
+deep-translator
