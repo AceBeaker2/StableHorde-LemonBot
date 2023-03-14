@@ -8,7 +8,7 @@
 - Highly-Customizable generation commands
 - Text2Image, Image2Image, and rudimentary outpainting
 - Easy setup and config editing
-- Prompt Filtering to prevent CP/abuse
+- Prompt scanning through the horde!
 
 #### TODO:
 - [x] CLIP interrogator(somewhat working)
