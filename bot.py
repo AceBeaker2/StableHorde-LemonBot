@@ -94,7 +94,7 @@ class UpscaleView(disnake.ui.View):
         inter_response = await inter.original_response()         
             
         vvars = {
-                 'prompt': '(intricate:1.4) paint, intricate, trending on artstation with intricate oil painted details',
+                 'prompt': self.vars['prompt'],
                  'neg_prompt': self.vars['neg_prompt'],
                  'width': width,
                  'height': height,
@@ -112,7 +112,7 @@ class UpscaleView(disnake.ui.View):
                  'filter':nsfw,
                  'dm': dm,
                  'author': author,
-                 'denoising_strength': 0.2,
+                 'denoising_strength': 0,
                  'seed': -1,
                  'inter_response': inter_response,
                  'amount' : 1,
