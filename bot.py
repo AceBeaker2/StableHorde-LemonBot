@@ -15,6 +15,10 @@ import io
 import ast
 import aiofiles
 
+import argparse
+
+from random import randint
+
 import os
 import json
 
@@ -41,9 +45,9 @@ class UpscaleView(disnake.ui.View):
         self.codeid = codeid
         self.vars = ast.literal_eval(text)
         self.number = number
-        filepath = asyncio.run(upscale_code(codeid, number))
+        filepath = asyncio.run(views.upscale_code(codeid, number))
         self.filepath = filepath
-        self.color = asyncio.run(average_color(self.filepath))
+        self.color = asyncio.run(views.average_color(self.filepath))
         
         self.moreinfo.custom_id = f'{codeid}@{number}@m'
         
@@ -53,11 +57,11 @@ class UpscaleView(disnake.ui.View):
         
         self.outpaint.custom_id = f'{codeid}@{number}@o'
     
-    @disnake.ui.button(custom_id='info', label='More Info!', style=disnake.ButtonStyle.blurple, emoji=settings.thinking_emoji , row=1)
+    @disnake.ui.button(custom_id='info', label='More Info!', style=disnake.ButtonStyle.blurple, emoji=settings.thinking_emoji, row=1)
     async def moreinfo(self, button: disnake.ui.Button, inter: disnake.MessageInteraction):
         embed=disnake.Embed(title='Status Sheet', color=self.color)
         
-        embed.add_field(name='Seed:', value=self.vars[str(self.number-1)]['seed'], inline=False)
+        embed.add_field(name='Seed:', value=self.vars.get(str(self.number-1), -1).get('seed', -1), inline=False)
         embed.add_field(name='Seed:', value=self.vars['0']['seed'], inline=False)
         embed.add_field(name='Sampler:', value=self.vars['sampler'], inline=False)
         embed.add_field(name='Prompt:', value=self.vars['prompt'][:1024], inline=False)
@@ -115,6 +119,7 @@ class UpscaleView(disnake.ui.View):
                  'tiling' : False,
                  'hires_fix' : False,
                  'english' : True,
+                 'midj' : False,
                 }
         await query_api(settings.url + settings.endpoint, vvars, inter)
     
@@ -161,6 +166,7 @@ class UpscaleView(disnake.ui.View):
                  'tiling' : False,
                  'hires_fix' : False,
                  'english' : False,
+                 'midj' : False,
                 }
         await query_api(settings.url + settings.endpoint, vvars, inter)
     
@@ -208,6 +214,7 @@ class UpscaleView(disnake.ui.View):
                  'tiling' : False,
                  'hires_fix' : True,
                  'english' : False,
+                 'midj' : self.vars.get('midj', False),
                  }
         await query_api(settings.url + settings.endpoint, vvars, inter)
 
@@ -290,35 +297,43 @@ class UpscaleView(disnake.ui.View):
             'tiling' : False,
             'hires_fix' : True,
             'english' : False,
+            'midj' : False,
             }
         await query_api(settings.url + settings.endpoint, ovars, inter)
     
 class GenView(disnake.ui.View):
-    def make_view(self, amount, codeid):
+    def make_view(self, amount, codeid, midj=False):
     
-        u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0)
-        u2 = disnake.ui.Button(custom_id='u2', label='U2', style=disnake.ButtonStyle.blurple, row=0)
-        u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=0)
-        u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=0)
-        u5 = disnake.ui.Button(custom_id='u5', label='U5', style=disnake.ButtonStyle.blurple, row=1)
-        u6 = disnake.ui.Button(custom_id='u6', label='U6', style=disnake.ButtonStyle.blurple, row=1)
-        u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=1)
-        u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=1)
-        u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=1)
+        u1 = disnake.ui.Button(custom_id=codeid+'_u1', label='U1', style=disnake.ButtonStyle.blurple, row=0)
+        u2 = disnake.ui.Button(custom_id=codeid+'_u2', label='U2', style=disnake.ButtonStyle.blurple, row=0)
+        u3 = disnake.ui.Button(custom_id=codeid+'_u3', label='U3', style=disnake.ButtonStyle.blurple, row=0)
+        u4 = disnake.ui.Button(custom_id=codeid+'_u4', label='U4', style=disnake.ButtonStyle.blurple, row=0)
+        u5 = disnake.ui.Button(custom_id=codeid+'_u5', label='U5', style=disnake.ButtonStyle.blurple, row=1)
+        u6 = disnake.ui.Button(custom_id=codeid+'_u6', label='U6', style=disnake.ButtonStyle.blurple, row=1)
+        u7 = disnake.ui.Button(custom_id=codeid+'_u7', label='U7', style=disnake.ButtonStyle.blurple, row=1)
+        u8 = disnake.ui.Button(custom_id=codeid+'_u8', label='U8', style=disnake.ButtonStyle.blurple, row=1)
+        u9 = disnake.ui.Button(custom_id=codeid+'_u9', label='U9', style=disnake.ButtonStyle.blurple, row=1)
     
         if amount == 1:
-            u1 = disnake.ui.Button(custom_id='u1', label='U1', style=disnake.ButtonStyle.blurple, row=0, disabled=True)
+            u1 = disnake.ui.Button(custom_id=codeid+'_u1', label='U1', style=disnake.ButtonStyle.blurple, row=0, disabled=True)
         elif amount == 4:
-            u3 = disnake.ui.Button(custom_id='u3', label='U3', style=disnake.ButtonStyle.blurple, row=1)
-            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+            u3 = disnake.ui.Button(custom_id=codeid+'_u3', label='U3', style=disnake.ButtonStyle.blurple, row=1)
+            u4 = disnake.ui.Button(custom_id=codeid+'_u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
         elif amount == 6:
-            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+            u4 = disnake.ui.Button(custom_id=codeid+'_u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
         elif amount == 9:
-            u4 = disnake.ui.Button(custom_id='u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
-            u7 = disnake.ui.Button(custom_id='u7', label='U7', style=disnake.ButtonStyle.blurple, row=2)
-            u8 = disnake.ui.Button(custom_id='u8', label='U8', style=disnake.ButtonStyle.blurple, row=2)
-            u9 = disnake.ui.Button(custom_id='u9', label='U9', style=disnake.ButtonStyle.blurple, row=2)
+            u4 = disnake.ui.Button(custom_id=codeid+'_u4', label='U4', style=disnake.ButtonStyle.blurple, row=1)
+            u7 = disnake.ui.Button(custom_id=codeid+'_u7', label='U7', style=disnake.ButtonStyle.blurple, row=2)
+            u8 = disnake.ui.Button(custom_id=codeid+'_u8', label='U8', style=disnake.ButtonStyle.blurple, row=2)
+            u9 = disnake.ui.Button(custom_id=codeid+'_u9', label='U9', style=disnake.ButtonStyle.blurple, row=2)
         
+        regen = disnake.ui.Button(custom_id=codeid+'_regen', emoji=settings.redo_emoji, style=disnake.ButtonStyle.blurple, row=1)
+        
+        async def regencallback(interaction):
+            with open('textcache/' + codeid + '.txt', 'r') as f:
+                text = f.read()
+            rvars = ast.literal_eval(text)
+            await imagine(interaction, rvars['raw_prompt'])
         async def u1callback(interaction):
             await upscale(interaction, number=1, code=codeid)
         async def u2callback(interaction):
@@ -338,7 +353,7 @@ class GenView(disnake.ui.View):
         async def u9callback(interaction):
             await upscale(interaction, number=9, code=codeid)
     
-    
+        regen.callback = regencallback
         u1.callback = u1callback
         u2.callback = u2callback
         u3.callback = u3callback
@@ -350,9 +365,8 @@ class GenView(disnake.ui.View):
         u9.callback = u9callback
     
         view = disnake.ui.View(timeout=None)
-    
         if amount >= 1:
-            view.add_item(u1) 
+            view.add_item(u1)
         if amount >= 2:
             view.add_item(u2)    
         if amount >= 4:
@@ -366,7 +380,8 @@ class GenView(disnake.ui.View):
             view.add_item(u8)
         if amount >= 9:
             view.add_item(u9)
-            
+        if midj:
+            view.add_item(regen)
         return view
    
     
@@ -394,7 +409,7 @@ class PersistentViewBot(commands.Bot):
                 elif '_' in line:
                     elements = line.split('_')
                     view = GenView()
-                    self.add_view(view.make_view(int(elements[1]),elements[0]))
+                    self.add_view(view.make_view(int(elements[1]),elements[0], True))
                     
             self.persistent_views_added = True
 
@@ -460,7 +475,7 @@ async def caption(
                 
         buffer = io.BytesIO(image_bytes)
         buffer.seek(0)
-        color = await average_color(Image.open(buffer))
+        color = await views.average_color(Image.open(buffer))
         embed = disnake.Embed(title='Image Captioned!', color=color)
         embed.set_thumbnail(url=image.url)
         embed.add_field(name='Caption:', value=jsondata['forms'][0]['result']['caption'], inline=False)
@@ -489,12 +504,12 @@ async def upscale(
         vars = ast.literal_eval(text)
     
     if not number == 200:
-        filepath = await upscale_code(code, number)
+        filepath = await views.upscale_code(code, number)
     else:
         filepath = 'imagecache/' + code + settings.img_type
     
     #try:
-    color = await average_color(filepath)
+    color = await views.average_color(filepath)
     if not number == 200:
         embed=disnake.Embed(title='Upscale Done!', color=color)
         embed.add_field(name='Seed:', value=str(vars[str(number-1)]['seed']), inline=False)
@@ -503,20 +518,15 @@ async def upscale(
         embed.add_field(name='Seed:', value=str(vars['0']['seed']), inline=False)
     embed.set_image(file=disnake.File(filepath))
     
-    message = await inter.followup.send('Image for ' + inter.author.mention + '!',embed=embed)
-    
-    imageurl = message.embeds[0].image.url
-    
     view = UpscaleView(code, number)
     
+    if not vars.get('midj', False):
+        message = await inter.followup.send('Image for ' + inter.author.mention + '!',embed=embed, view=view)
+    else:
+        message = await inter.followup.send('Image for ' + inter.author.mention + '!',file=disnake.File(filepath), view=view)
+
     await views.add_data(code + '@' + str(number))
-        
-    embed.set_image(url=imageurl)
-    
-    await message.delete()
-    
-    message = await inter.followup.send('Image done: ' + inter.author.mention + '!',embed=embed, view=view)
-    
+
 @bot.slash_command(description='Generates images using Stable Horde!')
 async def generate(
     inter: disnake.ApplicationCommandInteraction,
@@ -526,8 +536,8 @@ async def generate(
     model: str = commands.Param(default=settings.default_model,autocomplete=settings.autocomp_models, description='Which model to generate the image with. Default: ' + str(settings.default_model)),
     cfg_scale: Optional[float] = commands.Param(default=8, le=30, ge=-40, description='How much the image should look like your prompt. Default: 8'),
     #imageurl: str = commands.Param(name = 'init_image', default = None, description='Initial image for img2img.'),
-    width: int = commands.Param(default = settings.default_width, le=1024, ge=64, description='Width of the final image. Default: ' + str(settings.default_width)),
-    height: int = commands.Param(default = settings.default_height, le=1024, ge=64, description='Height of the final image. Default: ' + str(settings.default_height)),    
+    width: int = commands.Param(default = settings.default_width, le=settings.max_size, ge=64, description='Width of the final image. Default: ' + str(settings.default_width)),
+    height: int = commands.Param(default = settings.default_height, le=settings.max_size, ge=64, description='Height of the final image. Default: ' + str(settings.default_height)),    
     sampler: str = commands.Param(default = settings.default_sampler, description = 'ADVANCED: Which stable diffusion sampler to use. Default: ' + settings.default_sampler, choices=settings.sampler_list),
     steps: int = commands.Param(default=settings.default_steps, le=50, ge=1, description='Greater: Higher Image Quality but takes longer. Default: ' + str(settings.default_steps)),
     seed: int = commands.Param(default=-1, description='Seed for the image.'),
@@ -602,6 +612,110 @@ async def generate(
         'tiling' : tiling,
         'hires_fix' : hires_fix,
         'english' : english,
+        'midj' : False,
+        }
+    global url
+    global endpoint
+    await query_api(settings.url + settings.endpoint, vars, inter)
+    
+@bot.slash_command(description='Midjourney for brokies')
+async def imagine(
+    inter: disnake.ApplicationCommandInteraction,
+    prompt: str = commands.Param(description='The prompt to imagine (supports midj args)'),
+    ): 
+    model = 'Deliberate'
+    
+    raw_prompt = prompt
+    
+    if 'anime' in prompt or 'waifu' in prompt:
+        model = 'Anything v3'
+        
+    neg_prompt = '2d, grid, text'
+    if not model in settings.model_list:
+        await inter.response.send_message('Invalid Model: ```'+model+'```', ephemeral=True)
+        return
+    
+    steps = 30
+    cfg_scale = 8
+    tiling = False
+    width = settings.default_width
+    height = settings.default_height
+    
+    
+    #try:
+    if 1:
+        arguments = prompt.split('-')
+        prompt = arguments.pop(0)
+        if not len(arguments) == 0:  
+            arguments = ('-' + '-'.join(arguments)).split(' ')
+            print(arguments)
+            for i, argument in enumerate(arguments):
+                try:
+                    keyvalue = arguments[i+1]
+                except:
+                    keyvalue = None
+                print(f'{argument} : {keyvalue}')
+                if argument in ['--ar', '-ar', '-aspect' ,'--aspect']:
+                    width, height = await views.ar2size(keyvalue, settings.default_size)
+                elif argument in ['--chaos', '-chaos']:
+                    cfg_scale = int(keyvalue)//3.5
+                elif argument in ['--no', '-no']:
+                    neg_prompt = neg_prompt + ', ' + keyvalue
+                elif argument in ['--quality', '-quality']:
+                    steps = round(float(keyvalue)*35)
+                elif argument in ['--niji', '-niji']:
+                    model = 'Anything v3'
+                elif argument in ['--tile', '-tile']:
+                    tiling = True
+                elif '-' in argument:
+                    await inter.response.send_message('Invalid argument: ```' + argument + '```')
+                    return
+        await inter.response.send_message('You got it, boss :saluting_face:', ephemeral=True)
+    #except:
+    #    await inter.response.send_message('Invalid Args', ephemeral=True)
+    #    return
+     
+    karras = True
+    dm = False
+    imageurl = None
+    userid = inter.author.mention
+
+    try:
+        nsfw = not inter.channel.nsfw or settings.nsfw_filter
+            
+    except AttributeError:
+        dm = True
+        nsfw = True
+    
+    vars = {
+        'prompt': prompt,
+        'neg_prompt': neg_prompt,
+        'width': width,
+        'height': height,
+        'upscalers': 'GFPGAN',
+        'model': model,
+        'cfg_scale': cfg_scale,
+        'imageurl': imageurl,
+        'userid': userid,
+        'channelid': inter.channel_id,
+        'sampler': 'k_euler_a',
+        'karras': karras,
+        'steps': steps,
+        'source_image': None,
+        'source_processing': 'img2img',
+        'source_mask': None,
+        'filter':nsfw,
+        'dm': dm,
+        'author': inter.author,
+        'denoising_strength': 0.75,
+        'seed': -1,
+        'inter_response': None,
+        'amount': 4,
+        'tiling' : tiling,
+        'hires_fix' : True,
+        'english' : True,
+        'midj' : True,
+        'raw_prompt' : raw_prompt,
         }
     global url
     global endpoint
@@ -702,6 +816,7 @@ async def riff(
         'hires_fix' : hires_fix,
         'english' : english,
         'control_type' : control_type,
+        'midj' : False,
         }
     global url
     global endpoint
@@ -795,103 +910,12 @@ async def outpaint(
         'amount': amount,
         'tiling' : tiling,
         'hires_fix' : hires_fix,
-        'english' : english
+        'english' : english,
+        'midj' : False,
         }
     global url
     global endpoint
     await query_api(settings.url + settings.endpoint, vars, inter)
-
-async def make_grid(images, amount):
-    im0 = images[0]
-    width, height = im0.width, im0.height
-    
-    if amount == 1:
-        return im0
-    
-    elif amount == 2:
-        dst = Image.new('RGB', (width*2, height))
-        
-        dst.paste(images[0], (0,0))
-        dst.paste(images[1], (width, 0))
-        
-    elif amount == 4:
-        dst = Image.new('RGB', (width*2, height*2))
-        
-        dst.paste(images[0], (0,0))
-        dst.paste(images[1], (width, 0))
-        
-        dst.paste(images[2], (width, height))
-        dst.paste(images[3], (0, height))
-        
-    elif amount == 6:
-        dst = Image.new('RGB', (width*3, height*2))
-        
-        dst.paste(images[0], (0,0))
-        dst.paste(images[1], (0, height))
-        
-        dst.paste(images[2], (width, 0))
-        dst.paste(images[3], (width, height))
-        
-        dst.paste(images[4], (width*2, 0))
-        dst.paste(images[5], (width*2, height))
-        
-    elif amount == 8:
-        dst = Image.new('RGB', (width*4, height*2))
-        
-        dst.paste(images[0], (0,0))
-        dst.paste(images[1], (width, 0))
-        dst.paste(images[2], (width*2,0))
-        dst.paste(images[3], (width*3, 0))
-        
-        dst.paste(images[4], (0,height))
-        dst.paste(images[5], (width, height))
-        dst.paste(images[6], (width*2,height))
-        dst.paste(images[7], (width*3, height))
-        
-    else:
-        dst = Image.new('RGB', (width*3, height*3))
-        
-        dst.paste(images[0], (0,0))
-        dst.paste(images[1], (width, 0))
-        dst.paste(images[2], (width*2,0))
-        
-        dst.paste(images[3], (0,height))
-        dst.paste(images[4], (width, height))
-        dst.paste(images[5], (width*2,height))
-        
-        dst.paste(images[6], (0,height*2))
-        dst.paste(images[7], (width, height*2))
-        dst.paste(images[8], (width*2,height*2))
-    return dst
-
-async def url2base64(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            image_data = await response.read()
-            image = Image.open(io.BytesIO(image_data))
-            width, height = image.size
-            
-            rounded_width = 0
-            rounded_height = 0
-
-            if width <= height:
-                rounded_width = settings.default_width
-                rounded_height = (height/width*settings.default_width)
-            else:
-                rounded_height = settings.default_height
-                rounded_width = (width/height*settings.default_width)
-
-            rounded_width = round(rounded_width / 64) * 64
-            rounded_height = round(rounded_height / 64) * 64
-            rounded_width = min(max(rounded_width, 64), 1024)
-            rounded_height = min(max(rounded_height, 64), 1024)
-            image_resized = image.resize((rounded_width, rounded_height))
-            bytesio = io.BytesIO()
-            image_resized.save(bytesio, format = settings.format_type)
-            
-            bytesio.seek(0)
-            image_string = base64.b64encode(bytesio.read()).decode()
-            return [image_string, rounded_width, rounded_height]
 
 async def pil2base64(image):
     width, height = image.size
@@ -908,8 +932,8 @@ async def pil2base64(image):
         
     rounded_width = round(rounded_width / 64) * 64
     rounded_height = round(rounded_height / 64) * 64
-    rounded_width = min(max(rounded_width, 64), 1024)
-    rounded_height = min(max(rounded_height, 64), 1024)
+    rounded_width = min(max(rounded_width, 64), settings.max_size)
+    rounded_height = min(max(rounded_height, 64), settings.max_size)
     image_resized = image.resize((rounded_width, rounded_height))
     bytesio = io.BytesIO()
     image_resized.save(bytesio, format = settings.format_type)
@@ -918,78 +942,20 @@ async def pil2base64(image):
     image_string = base64.b64encode(bytesio.read()).decode()
     return [image_string, width, height]
 
-async def attach2base64(image):
-    image_data = await image.read()
-    image = Image.open(io.BytesIO(image_data))
-    width, height = image.size
-            
-    rounded_width = 0
-    rounded_height = 0
-
-    if width <= height:
-        rounded_width = settings.default_width
-        rounded_height = (height/width*settings.default_width)
-    else:
-        rounded_height = settings.default_height
-        rounded_width = (width/height*settings.default_width)
-        
-    rounded_width = round(rounded_width / 64) * 64
-    rounded_height = round(rounded_height / 64) * 64
-    rounded_width = min(max(rounded_width, 64), 1024)
-    rounded_height = min(max(rounded_height, 64), 1024)
-    image_resized = image.resize((rounded_width, rounded_height))
-    bytesio = io.BytesIO()
-    image_resized.save(bytesio, format = settings.format_type)
-    
-    bytesio.seek(0)
-    image_string = base64.b64encode(bytesio.read()).decode()
-            
-    return [image_string, rounded_width, rounded_height]
-        
-async def url2mask(url):
+async def url2base64(url):
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as response:
             image_data = await response.read()
             image = Image.open(io.BytesIO(image_data))
-            width, height = image.size
-            
-            rounded_width = 0
-            rounded_height = 0
+            data = await pil2base64(image)
+            return data
 
-            if width <= height:
-                rounded_width = 512
-                rounded_height = (height/width*512)
-            else:
-                rounded_height = 512
-                rounded_width = (width/height*512)
-            
-            rounded_width = round(width / 64) * 64
-            rounded_height = round(height / 64) * 64
-            rounded_width = min(max(rounded_width, 64), 1024)
-            rounded_height = min(max(rounded_height, 64), 1024)
-            
-            image_resized = image.resize((rounded_width//3+2, rounded_height//3+2))
-            
-            canvas = Image.new('RGB', (rounded_width, rounded_height), color='white')
-            
-            xy = (rounded_width//3)
-            
-            canvas.paste(image_resized, (xy-1, xy-1))
-            
-            bytesio = io.BytesIO()
-            canvas.save(bytesio, format = settings.format_type)
-            bytesio.seek(0)
-            image_string = base64.b64encode(bytesio.read()).decode()
-            
-            draw = ImageDraw.Draw(canvas)
-            draw.rectangle((xy, xy, xy*2, xy*2), fill='black')
-            
-            bytesio = io.BytesIO()
-            canvas.save(bytesio, format = settings.format_type)
-            bytesio.seek(0)
-            mask_string = base64.b64encode(bytesio.read()).decode()
-            
-            return [image_string, mask_string, rounded_width, rounded_height]
+
+async def attach2base64(image):
+    image_data = await image.read()
+    image = Image.open(io.BytesIO(image_data))
+    data = await pil2base64(image)
+    return data
 
 async def pil2mask(image):
     width, height = image.size
@@ -1006,8 +972,8 @@ async def pil2mask(image):
             
     rounded_width = round(width / 64) * 64
     rounded_height = round(height / 64) * 64
-    rounded_width = min(max(rounded_width, 64), 1024)
-    rounded_height = min(max(rounded_height, 64), 1024)
+    rounded_width = min(max(rounded_width, 64), settings.max_size)
+    rounded_height = min(max(rounded_height, 64), settings.max_size)
             
     image_resized = image.resize((rounded_width//3+2, rounded_height//3+2))
             
@@ -1032,34 +998,14 @@ async def pil2mask(image):
             
     return [image_string, mask_string, rounded_width, rounded_height]
 
-async def average_color(path):
-    try:
-        im = Image.open(path)
-    except:
-        im = path
-    
-    width, height = im.size
-    
-    im = im.resize((width//16, height//16))
-    
-    width, height = im.size
-    
-    pixels = list(im.getdata())
-    n = len(pixels)
-    r_sum = g_sum = b_sum = 0
-    for pixel in pixels:
-        r, g, b = pixel
-        r_sum += r
-        g_sum += g
-        b_sum += b
-        
-    average_color = (r_sum//n, g_sum//n, b_sum//n)
-    
-    high = max(average_color)
-    low = min(average_color)
-    average_color = tuple([min(255, max(0, x + (-100 if x == low else 100 if x == high else 0))) for x in average_color])
-    
-    return (average_color[0] << 16) + (average_color[1] << 8) + average_color[2]
+async def url2mask(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            image_data = await response.read()
+            image = Image.open(io.BytesIO(image_data))
+            data = await pil2mask(image)
+            return data
+
 
 async def shade_cells(width, height, gens, amount):
     rounded_width = rounded_height = 0
@@ -1104,50 +1050,9 @@ async def shade_cells(width, height, gens, amount):
     for color in generations:
         images.append(Image.new('RGB', (width, height), color=color))
 
-    dst = await make_grid(images, amount)
+    dst = await views.make_grid(images, amount)
     dst.save('waitcache/' + imagename)
     return 'waitcache/' + imagename
-    
-async def upscale_code(code, number):
-    filepath = 'upscalecache/' + code + '_' + str(number) + settings.img_type
-    
-    with open('textcache/' + code + '.txt', 'r') as f:
-        text = f.read()
-        amount = ast.literal_eval(text)['amount']
-    
-    if os.path.isfile(filepath):
-        return filepath
-    
-    img = Image.open('imagecache/' + code + settings.img_type)  
-    
-    grid_width = 2
-    grid_height = 2
-    
-    if amount == 2:
-        grid_height = 1
-    elif amount == 6:
-        grid_width = 3
-    elif amount == 8:
-        grid_width = 4
-    elif amount == 9:
-        grid_width = 3
-        grid_height = 3
-    
-    cell_width = img.width // grid_width
-    cell_height = img.height // grid_height
-    
-    row = (number-1) // grid_width
-    col = (number-1) % grid_width
-    left = col * cell_width
-    top = row * cell_height
-    right = left + cell_width
-    bottom = top + cell_height
-        
-    print(left, top, right, bottom)
-    
-    img = img.crop((left, top, right, bottom))
-    img.save(filepath)
-    return filepath
 
 async def fetch_image(session, url):
     async with session.get(url) as response:
@@ -1162,14 +1067,15 @@ async def url_to_pil(url):
 
 
 async def query_api(url, vars, interaction):
+    if randint(1,20) == 1:
+        settings.autocomp_models = settings.redefine_autocomp()
     msg_channel = bot.get_channel(vars['channelid'])
     if vars['dm']:
         msg_channel = vars['author']
     try:
         checkprompt = intents.check_cp(vars['prompt'])
-        checknegprompt = intents.check_cp(vars['neg_prompt'])
     
-        if checkprompt[0] or checknegprompt[0]:
+        if checkprompt[0]:
             await msg_channel.send(vars['userid'] +', Suspected Child Porn prompt has been blocked and reported. If repeated multiple times, risk being banned.')
             return
     except:
@@ -1210,15 +1116,20 @@ async def query_api(url, vars, interaction):
         if not vars['control_type'] == None:
             params.update({'control_type': vars['control_type']})
 
-    if not vars['seed'] == -1:
-        params.update({'seed': str(vars['seed'])})
+    if not vars.get('seed', -1) == -1:
+        params.update({'seed': str(vars.get('seed', -1))})
 
     if not vars['english']:
         vars['prompt'] = await views.trans_query(vars['prompt'])
         vars['neg_prompt'] = await views.trans_query(vars['neg_prompt'])
 
+    if vars['midj']:
+        prompt = await settings.enhance_prompt(vars['prompt'])
+    else:
+        prompt = vars['prompt']
+        
     json_data = {
-        'prompt': vars['prompt'] + '###' + vars['neg_prompt'],
+        'prompt': prompt + '###' + vars['neg_prompt'] + ', nsfw',
         'params': params,
         'nsfw': True,
         'trusted_workers': True,
@@ -1278,7 +1189,7 @@ async def query_api(url, vars, interaction):
                         
                         filelocation = await shade_cells(vars['width'], vars['height'], gens, vars['amount'])
                         
-                        color = await average_color(filelocation)
+                        color = await views.average_color(filelocation)
                         
                         embed=disnake.Embed(title='Generating job!', color=color)
                         embed.add_field(name='Finished:', value=str(gens['finished']), inline=True)
@@ -1292,10 +1203,10 @@ async def query_api(url, vars, interaction):
                             embed.add_field(name='Queue Position:', value=str(gens['queue_position']), inline=True)
                         embed.set_image(file=disnake.File(filelocation))
                         
-                        if settings.use_embeds:
+                        if not vars['midj']:
                             await message.edit(embed=embed)
                         else:
-                            await message.edit('Finished: ' + str(gens['finished']) + ', Processing: ' + str(gens['processing']) + ', Restarted: ' + str(gens['restarted']) + ', Waiting: ' + str(gens['waiting']) + ' Content filter: ' + str(vars['nsfw']) + ' Code(for debugging): ||' + codeid + '||', file=disnake.File(filelocation))
+                            await message.edit(f'**{vars["raw_prompt"]}** - ' + vars['userid'], file=disnake.File(filelocation))
                         
                         current = time.time()-start
                         
@@ -1310,7 +1221,8 @@ async def query_api(url, vars, interaction):
                     await session.close()
                     return
             # Wait for the specified amount of time before making the next query
-            await asyncio.sleep(settings.wait_time)
+            if not done:
+                await asyncio.sleep(settings.wait_time)
             print(failed)
             print(done)
         await views.add_data(codeid + '_' + str(vars['amount']))
@@ -1371,17 +1283,17 @@ async def query_api(url, vars, interaction):
                                 
                 for i in range(vars['amount']-len(results)):
                     results.append(error_image)
-                finalgrid = await make_grid(results, vars['amount'])
+                finalgrid = await views.make_grid(results, vars['amount'])
                 finalgrid.save('imagecache/' + codeid + settings.img_type)
                 
                 if settings.use_embeds:
                     
                     view = GenView()
-                    view = view.make_view(vars['amount'], codeid)
+                    view = view.make_view(vars['amount'], codeid, vars['midj'])
                         
                     filepath = 'imagecache/' + codeid + settings.img_type
                     
-                    color = await average_color(filepath)
+                    color = await views.average_color(filepath)
                                         
                     embed=disnake.Embed(title='Job Complete!', color=color)
                     embed.add_field(name='Content Filter:', value=str(vars['filter']), inline=True)
@@ -1392,18 +1304,21 @@ async def query_api(url, vars, interaction):
                     if amount == 1:
                         await upscale(interaction, codeid, 200)
                         return
-                    try:
-                        message = await vars['inter_response'].reply('Job done for user ' + vars['userid'], embed=embed, view=view)
-                        embed.set_image(file=disnake.File(filepath))
-                        await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
-                    except:
-                        message = await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
-                        embed.set_image(file=disnake.File(filepath))
-                        await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
-                        #try:
-                        #    await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
-                        #except:
-                        #    await msg_channel.send_message('Job done for user ' + vars['userid'], embed=embed, view=view)
+                    if not vars['midj']:
+                        try:
+                            message = await vars['inter_response'].reply('Job done for user ' + vars['userid'], embed=embed, view=view)
+                            embed.set_image(file=disnake.File(filepath))
+                            await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
+                        except:
+                            message = await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
+                            embed.set_image(file=disnake.File(filepath))
+                            await message.edit('Job done for user ' + vars['userid'], embed=embed, view=view)
+                            #try:
+                            #    await msg_channel.send('Job done for user ' + vars['userid'], embed=embed, view=view)
+                            #except:
+                            #    await msg_channel.send_message('Job done for user ' + vars['userid'], embed=embed, view=view)
+                    else:
+                        await msg_channel.send(f'**{vars["raw_prompt"]}** - ' + vars['userid'], file=disnake.File(filepath), view=view)
                 else:
                     await message.edit(file=disnake.File('imagecache/' + codeid + settings.img_type))
 
