@@ -411,12 +411,8 @@ async def upscale(
     
     if number == 200:
         message = await inter.followup.send('Image for ' + inter.author.mention + '!',file=disnake.File(filepath))
-        with open('textcache/' + code + '-url.txt', 'w') as f:
-            f.write(message.attachments[0].url)
     else:
         message = await inter.followup.send('Image for ' + inter.author.mention + '!',file=disnake.File(filepath), view=view)
-        with open('textcache/' + code + '-url.txt', 'w') as f:
-            f.write(message.attachments[0].url)
         
     await views.add_data(code + '@' + str(number))
 
