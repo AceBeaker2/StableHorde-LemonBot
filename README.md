@@ -21,7 +21,7 @@
 
 ##### Prerequisites:
 - [git](https://git-scm.com/downloads)
-- [Python 3](https://www.python.org/downloads/)
+- [Python 3.10+](https://www.python.org/downloads/)
 - [pip](https://pip.pypa.io/en/stable/installation/)
 
 #### Installation(Linux/MacOS):
