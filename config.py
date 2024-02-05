@@ -8,10 +8,10 @@ model_list = ['stable_diffusion', 'Midjourney Diffusion', 'Furry Epoch', 'Yiffy'
 # note that only stable horde models will work. Find this list at
 # https://stablehorde.net/api/v2/status/models
 
-token = 'BOT-TOKEN-HERE'
+token = 'BOT_TOKEN'
 # discord bot token
 
-sd_api_key = 'HORDE-TOKEN-HERE'
+sd_api_key = 'SD_API_KEY'
 # horde api key, planning to add /link, and /unlink
 
 default_images = 4
@@ -25,8 +25,8 @@ nsfw_filter = False
 default_sampler = 'k_euler_a'
 # default sampler for generations
 
-default_model = 'stable_diffusion'
-default_riff = 'pix2pix'
+default_model = 'Deliberate'
+default_riff = 'Deliberate'
 # default model for generations
 
 default_size = 768
@@ -39,8 +39,8 @@ default_steps = 23
 # default steps for generations
 
 input_types = ('png', 'jpg', 'jpeg', 'webp', '.PNG', '.JPG', '.JPEG', '.WEBP')
-img_type = '.webp'
-format_type = 'WEBP'
+img_type = '.png'
+format_type = 'PNG'
 # image file extension. Note: only PIL-supported types are supported right now.
 
 use_embeds = True
@@ -51,7 +51,7 @@ use_embeds = True
 accept_dm = True
 # whether to accept requests in the DMs
 
-save_nsfw = True
+save_nsfw = False
 # if set to true, nsfw-filtered images will be saved in nsfwcache.
 
 # ADVANCED SETTINGS:
@@ -102,7 +102,6 @@ art_enhancers = [
     ', art nouveau',
     ', cyberpunk',
     ', Pixar-style',
-    ', oil painting',
     ', concept art',
     ]
 
@@ -120,26 +119,27 @@ artists_enhancers = [
     ]
 
 import secrets
+import disnake
 
 async def enhance_prompt(prompt):
     global suf_enhancers
     global art_enhancers
     global artists_enhancers
     
-    for i in range(4):
+    for i in range(2):
         enhancer = secrets.choice(suf_enhancers)
         if not enhancer in prompt:
-            prompt = prompt + enhancer
+            prompt = prompt + f'({enhancer}:0.5)'
         
     for i in range(2):
         enhancer = secrets.choice(art_enhancers)
         if not enhancer in prompt:
-            prompt = prompt + enhancer
+            prompt = prompt + f'({enhancer}:0.5)'
         
-    for i in range(2):
+    for i in range(1):
         enhancer = secrets.choice(artists_enhancers)
         if not enhancer in prompt:
-            prompt = prompt + enhancer
+            prompt = prompt + f'({enhancer}:0.5)'
     print(prompt)
     return prompt
     
@@ -234,8 +234,6 @@ if 1:
 else:
     print('\n Using User-defined list: ' + str(model_list) + '\n')
 
-import disnake
-
 def redefine_autocomp():
     global model_list
     headers = {
@@ -268,8 +266,6 @@ def redefine_autocomp():
 
 autocomp_models = redefine_autocomp()
 
-if not os.path.isfile('persistence.txt'):
-    with open('persistence.txt', mode='a'): pass
     
 default_height = default_size
 default_width = default_size

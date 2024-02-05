@@ -11,6 +11,7 @@ import aiofiles
 from deep_translator import GoogleTranslator
 import ast
 import os
+import io
 import config as settings
 from PIL import Image
 import math
@@ -19,6 +20,13 @@ import json
 import aiohttp
 import asyncio
 
+async def url2pil(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            image_data = await response.read()
+            image = Image.open(io.BytesIO(image_data))
+            return image
+        
 async def ar2size(aspect_ratio, smaller_size):
     width, height = aspect_ratio.split(':')
     width, height = int(width), int(height)
@@ -53,7 +61,11 @@ async def upscale_code(code, number):
     if os.path.isfile(filepath):
         return filepath
     
-    img = Image.open('imagecache/' + code + settings.img_type)  
+    #img = Image.open('imagecache/' + code + settings.img_type)
+    with open('textcache/' + code + '-url.txt', 'r') as f:
+        imageurl = f.read()
+        
+    img = await url2pil(imageurl)
     
     grid_width = 2
     grid_height = 2
