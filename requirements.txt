@@ -10,3 +10,4 @@ Unidecode
 aiofiles
 nest-asyncio
 deep-translator
+protobuf==3.20.3
