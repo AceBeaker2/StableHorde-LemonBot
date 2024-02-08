@@ -320,6 +320,11 @@ async def see_help(inter):
     
     await inter.response.send_message(embed=embed)
 
+@bot.slash_command(description='See total amount of servers the bot is in!')
+async def total_servers(inter):
+    await inter.response.send_message(f'I am in {len(bot.guilds)} servers.', ephemeral=True)
+
+
 @bot.slash_command(description='Caption image with CLIP interrogator')
 async def caption(
     inter: disnake.ApplicationCommandInteraction,
