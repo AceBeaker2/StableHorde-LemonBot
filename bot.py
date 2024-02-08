@@ -304,7 +304,7 @@ class GenView(disnake.ui.View):
         return view
    
     
-class PersistentViewBot(commands.Bot):
+class PersistentViewBot(commands.AutoShardedBot):
     def __init__(self):
         super().__init__(command_prefix=commands.when_mentioned)
 
@@ -316,7 +316,7 @@ bot = PersistentViewBot()
 @bot.slash_command(description='Help menu!!!')
 async def see_help(inter):
     embed=disnake.Embed(title='Help menu!', color=0x00ff40)
-    embed.set_image(url='https://i.imgur.com/QLT48xE.png')
+    embed.set_image(url='https://i.imgur.com/Ke5vRBr.png')
     
     await inter.response.send_message(embed=embed)
 
@@ -413,6 +413,8 @@ async def upscale(
         message = await inter.followup.send('Image for ' + inter.author.mention + '!',file=disnake.File(filepath))
     else:
         message = await inter.followup.send('Image for ' + inter.author.mention + '!',file=disnake.File(filepath), view=view)
+        #with open('textcache/' + code + '-url.txt', 'w') as f:
+        #    f.write(message.attachments[0].url)
         
     await views.add_data(code + '@' + str(number))
 
@@ -865,7 +867,7 @@ async def shade_cells(width, height, gens, amount):
     for color in generations:
         images.append(Image.new('RGB', (width, height), color=color))
 
-    dst = await views.make_grid(images, amount)
+    dst = await views.make_grid(images, amount, width, height)
     dst.save('waitcache/' + imagename)
     return 'waitcache/' + imagename
 
@@ -1006,24 +1008,7 @@ async def query_api(url, vars, interaction):
                         
                         filelocation = await shade_cells(vars['width'], vars['height'], gens, vars['amount'])
                         
-                        color = await views.average_color(filelocation)
-                        
-                        embed=disnake.Embed(title='Generating job!', color=color)
-                        embed.add_field(name='Finished:', value=str(gens['finished']), inline=True)
-                        embed.add_field(name='Processing:', value=str(gens['processing']), inline=True)
-                        if int(gens['restarted'])>0:
-                            embed.add_field(name='Restarted:', value=str(gens['restarted']), inline=True)
-                        embed.add_field(name='Waiting', value=str(gens['waiting']), inline=True)
-                        embed.add_field(name='Content Filter:', value=str(vars['filter']), inline=True)
-                        embed.add_field(name='Code(for debugging):', value='||' + codeid + '||', inline=True)
-                        if int(gens['queue_position']) > 1:
-                            embed.add_field(name='Queue Position:', value=str(gens['queue_position']), inline=True)
-                        embed.set_image(file=disnake.File(filelocation))
-                        
-                        if not vars['midj']:
-                            await message.edit(embed=embed)
-                        else:
-                            await message.edit(f'**{vars["raw_prompt"]}** - ' + vars['userid'], file=disnake.File(filelocation))
+                        await message.edit(f'**{vars["raw_prompt"]}** - ' + vars['userid'], file=disnake.File(filelocation))
                         
                         current = time.time()-start
                         
@@ -1100,7 +1085,7 @@ async def query_api(url, vars, interaction):
                                 
                 for i in range(vars['amount']-len(results)):
                     results.append(error_image)
-                finalgrid = await views.make_grid(results, vars['amount'])
+                finalgrid = await views.make_grid(results, vars['amount'],vars['width'], vars['height'])
                 finalgrid.save('imagecache/' + codeid + settings.img_type)
                 
                 if settings.use_embeds:

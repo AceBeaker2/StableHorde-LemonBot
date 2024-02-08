@@ -96,10 +96,8 @@ async def upscale_code(code, number):
     img.save(filepath)
     return filepath
 
-async def make_grid(images, amount):
-    im0 = images[0]
-    width, height = im0.width, im0.height
-    
+async def make_grid(images, amount, width, height):
+    im0 = images[0]    
     if amount == 1:
         return im0
     
