@@ -1,6 +1,8 @@
 # StableHorde-LemonBot
 ## _A feature-rich async discord bot_
 
+### Check out my public instance at [quackertonai.com](https://www.quackertonai.com/)!
+
 #### Features:
 - Async functionality
 - Slash commands, buttons and modals!
